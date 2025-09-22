@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Header from '../components/Header';
 import MovieList from '../components/MovieList';
 import styles from '../styles/HomePage.module.css';
-import GenreFilter from '../components/GenreFilter';
+
 
 function HomePage() {
     const [movies, setMovies] = useState([]);
