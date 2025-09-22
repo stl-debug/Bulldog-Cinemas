@@ -16,7 +16,7 @@ function MovieList({ movies }) {
     const genres = [...new Set(movies.map(m => m.genre))];
 
     const currentlyRunning = movies.filter(
-        m => m.status === 'Now Playing' && (selectedGenre ? m.genre === selectedGenre : true)
+        m => m.status === 'Running' && (selectedGenre ? m.genre === selectedGenre : true)
     );
 
     const comingSoon = movies.filter(

@@ -8,7 +8,7 @@ const MovieSchema = new mongoose.Schema({
   description: String,
   posterUrl: String,
   trailerUrl: String,
-  status: { type: String, enum: ["Now Playing", "Coming Soon"], required: true },
+  status: { type: String, enum: ["Currently Running", "Coming Soon"], required: true },
   showtimes: [ShowtimeSchema]
 });
 
