@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Header from '../components/Header';
 import MovieList from '../components/MovieList';
 import styles from '../styles/HomePage.module.css';
+import GenreFilter from '../components/GenreFilter';
 
 function HomePage() {
     const [movies, setMovies] = useState([]);
@@ -14,27 +15,37 @@ function HomePage() {
                 title: 'Lemonade Mouth',
                 poster: '/images/lemonademouth.jpeg',
                 status: 'Running',
+                genre: 'Comedy',
             },
             {
                 id: 3,
                 title: 'Starstruck',
                 poster: '/images/starstruck.jpg',
                 status: 'Running',
+                genre: 'Romance'
             },
             {
                 id: 2,
                 title: 'Inside Out 3',
                 poster: '/images/insideout3.jpg',
                 status: 'Coming Soon',
+                genre: 'Family'
             },
+
         ]);
     }, []);
+
+    const [selectedGenre, setSelectedGenre] = useState("");
+
+    const genres = [...new Set(movies.map(m => m.genre))];
+
 
     return (
         <div>
             <Header />
+            
             <div className={styles.container}>
-                <MovieList movies={movies} />
+            <MovieList movies={movies} genre={selectedGenre} />
             </div>
         </div>
     );
