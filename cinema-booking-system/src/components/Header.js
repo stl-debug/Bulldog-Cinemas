@@ -1,15 +1,17 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
+import React from 'react';
+import { Link } from 'react-router-dom';
+import styles from '../styles/Header.module.css';
 
-function Header(){
-    return (<div>
-        <header style={{ padding: '1rem 0' }}>Cinema</header>
-            <nav style={{ display: 'flex', gap: '1rem' }}>
-                <Link to="/">Home</Link>
-                <Link to="/search">Search Movies</Link>
-                <Link to="/login">Login</Link>
+function Header() {
+    return (
+        <header className={styles.header}>
+            <div className={styles.logo}>BULLDOG CINEMAS</div>
+            <nav className={styles.navbar}>
+                <Link to="/" className={styles.navLink}>Home</Link>
+                <Link to="/search" className={styles.navLink}>Search Movies</Link>
+                <Link to="/login" className={styles.navLink}>Login</Link>
             </nav>
-        </div>
+        </header>
     );
 }
 
