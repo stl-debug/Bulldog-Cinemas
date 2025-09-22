@@ -16,7 +16,7 @@ function MovieDisplay({ movie }) {
                     {['2:00 PM', '5:00 PM', '8:00 PM'].map((time) => (
                         <Link
                             key={time}
-                            to={`/booking/${movie.id}/${encodeURIComponent(time)}`}
+                            to={`/booking/${movie._id}/${encodeURIComponent(time)}`}
                             className={styles.showtimeLink}
                         >
                             {time}
