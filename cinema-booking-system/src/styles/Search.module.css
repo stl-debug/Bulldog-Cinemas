@@ -1,0 +1,18 @@
+.searchContainer {
+    padding: 2rem;
+}
+input {
+    padding: 0.5rem;
+    font-size: 1rem;
+    margin-right: 1rem;
+}
+button {
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+}
+ul {
+    margin-top: 1rem;
+}
+li {
+    margin-bottom: 0.5rem;
+}

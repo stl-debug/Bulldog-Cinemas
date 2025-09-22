@@ -1,22 +1,24 @@
 import './App.css';
-import React from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';
-import SearchPage from './pages/Search';
 import LoginPage from './pages/Login';
-
+import SearchPage from './pages/Search';
+import MovieDetails from './pages/MovieDetails';
+import BookingPage from './pages/Booking';
 
 function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/login" element={<LoginPage />} />
-      </Routes>
-    </BrowserRouter>
-  );
+    return (
+        <Router>
+            <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/search" element={<SearchPage />} />
+                <Route path="/movie/:id" element={<MovieDetails />} />
+                <Route path="/booking/:movieId/:time" element={<BookingPage />} />
+            </Routes>
+        </Router>
+    );
 }
 
 export default App;

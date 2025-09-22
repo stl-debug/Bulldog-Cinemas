@@ -1,0 +1,50 @@
+.grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    justify-content: flex-start;
+}
+
+
+.movieDisplay {
+    background: #f9f9f9;
+    border-radius: 8px;
+    overflow: hidden;
+    width: 200px;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+    text-align: center; 
+}
+
+.movieDisplay:hover {
+    transform: scale(1.05);
+}
+
+.movieDisplay img {
+    width: 200px;    
+    height: 300px;   
+    object-fit: cover; 
+    border-bottom: 1px solid #ddd;
+}
+
+
+.movieTitle {
+    display: block;
+    margin: 0.5rem 0;
+    text-decoration: none;
+    font-weight: bold;
+    color: #333;
+}
+
+.movieTitle:hover {
+    color: #007bff;
+    text-decoration: underline;
+}
+
+.showtimes {
+    padding: 0.5rem;
+    display: flex;
+    justify-content: space-around;
+    font-size: 0.9rem;
+}
