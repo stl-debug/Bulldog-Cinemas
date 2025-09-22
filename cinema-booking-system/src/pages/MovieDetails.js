@@ -15,7 +15,7 @@ function MovieDetails() {
         rating: 'PG',
         description: 'Misfit students in detention together form a band',
         showtimes: ['2:00 PM', '5:00 PM', '8:00 PM'],
-        trailer: 'https://www.youtube.com/watch?v=Ecn8dvDK7LQ'
+        trailer: 'https://www.youtube.com/embed/Ecn8dvDK7LQ'
     };
 
     return (
