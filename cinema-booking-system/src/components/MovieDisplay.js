@@ -5,7 +5,13 @@ import { Link } from 'react-router-dom';
 function MovieDisplay({ movie }) {
     return (
         <div className={styles.movieDisplay}>
-           <img src={movie.posterUrl} alt={movie.title} className={styles.poster} />
+           <Link to={`/movie/${movie._id}`}>
+        <img
+            src={movie.posterUrl}
+            alt={movie.title}
+            className={styles.poster}
+        />
+            </Link>
 
 
             <Link to={`/movie/${movie._id}`} className={styles.movieTitle}>

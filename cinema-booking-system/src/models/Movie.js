@@ -10,4 +10,4 @@ const MovieSchema = new mongoose.Schema({
   showtimes: [{ time: String }]
 });
 
-module.exports = mongoose.model("Movie", MovieSchema, "movies"); // third param is collection name
+module.exports = mongoose.model("Movie", MovieSchema, "movies");

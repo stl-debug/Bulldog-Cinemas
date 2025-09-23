@@ -9,7 +9,7 @@ function MovieList() {
     const [movies, setMovies] = useState([]);
     const [selectedGenre, setSelectedGenre] = useState("");
 
-    // Fetch movies from backend when component mounts
+    // Fetch movies from backend
     useEffect(() => {
         fetch("http://localhost:5001/api/movies")
             .then(res => res.json())
@@ -47,7 +47,6 @@ function MovieList() {
                     <MovieDisplay 
                         key={movie._id} 
                         movie={movie} 
-                        onClick={() => handleMovieClick(movie._id)} 
                     />
                 ))}
             </div>

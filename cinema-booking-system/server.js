@@ -49,6 +49,15 @@ app.get("/api/movies/:id", async (req, res) => {
   }
 });
 
+app.get("/api/genres", async (req, res) => {
+  try {
+    const genres = await Movie.distinct("genre");
+    res.json(genres);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Create a new movie (testing)
 app.post("/api/movies", async (req, res) => {
   try {
@@ -67,11 +76,6 @@ mongoose.connection.once("open", async () => {
   const count = await Movie.countDocuments();
   console.log("Movies in DB:", count);
 });
-
-app.get("/api/test", (req, res) => {
-    res.send("API is working");
-});
-
 
 // Start server
 const PORT = process.env.PORT || 5001;

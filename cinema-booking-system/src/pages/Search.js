@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Header from '../components/Header';
 import GenreFilter from '../components/GenreFilter';
 import styles from '../styles/Search.module.css';
@@ -7,22 +7,35 @@ function SearchPage() {
     const [query, setQuery] = useState('');
     const [genre, setGenre] = useState('');
     const [results, setResults] = useState([]);
+    const [genres, setGenres] = useState([]);
 
-    const handleSearch = () => {
-        // Mock movie data
-        const movies = [
-            { id: 1, title: 'Lemonade Mouth', genre: 'Comedy'},
-            { id: 2, title: 'Inside Out 3', genre: 'Family' },
-            { id: 3, title: 'Starstruck', genre: 'Romance' },
-        ];
+    useEffect(() => {
+        const fetchGenres = async () => {
+            try {
+                const response = await fetch('http://localhost:5001/api/genres');
+                const data = await response.json();
+                setGenres(data);
+            } catch (error) {
+                console.error("Error fetching genres:", error);
+            }
+        };
+        fetchGenres();
+    }, []);
 
-        const genres = Array.from(new Set(movies.map(m => m.genre)));
-
-        const filtered = movies.filter(m => m.title.toLowerCase().includes(query.toLowerCase()) && (genre === '' || m.genre === genre));
-        setResults(filtered);
+    const handleSearch = async () => {
+        try {
+            const response = await fetch(`http://localhost:5001/api/movies`);
+            const data = await response.json();
+            
+            const filtered = data.filter(movie => {
+                return movie.title.toLowerCase().includes(query.toLowerCase()) &&
+                       (genre ? movie.genre === genre : true);
+            });
+            setResults(filtered);
+        } catch (error) {
+            console.error("Error fetching search results:", error);
+        }
     };
-
-    
 
     return (
         <div>
@@ -35,10 +48,10 @@ function SearchPage() {
                     placeholder="Search by title"
                 />
                 <button onClick={handleSearch}>Search</button>
-                <GenreFilter genres={['', 'Comedy', 'Family', 'Romance']} value={genre} onChange={(e) => setGenre(e.target.value)} />
+               <GenreFilter genres={['', ...genres]} value={genre} onChange={(e) => setGenre(e.target.value)} />
                 <ul>
                     {results.map(movie => (
-                        <li key={movie.id}>{movie.title}</li>
+                        <li key={movie._id}>{movie.title} - {movie.genre}</li>
                     ))}
                 </ul>
             </div>
