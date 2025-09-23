@@ -1,12 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MovieDisplay from './MovieDisplay';
-import GenreFilter from './GenreFilter'; // <-- import your dropdown
+import GenreFilter from './GenreFilter';
 import styles from '../styles/HomePage.module.css';
 import { useNavigate } from 'react-router-dom';
 
-function MovieList({ movies }) {
+function MovieList() {
     const navigate = useNavigate();
-    const [selectedGenre, setSelectedGenre] = useState(""); // <-- state for genre
+    const [movies, setMovies] = useState([]);
+    const [selectedGenre, setSelectedGenre] = useState("");
+
+    // Fetch movies from backend when component mounts
+    useEffect(() => {
+        fetch("http://localhost:5001/api/movies")
+            .then(res => res.json())
+            .then(data => setMovies(data))
+            .catch(err => console.error("Error fetching movies:", err));
+    }, []);
 
     const handleMovieClick = (id) => {
         navigate(`/movie/${id}`);
@@ -16,7 +25,7 @@ function MovieList({ movies }) {
     const genres = [...new Set(movies.map(m => m.genre))];
 
     const currentlyRunning = movies.filter(
-        m => m.status === 'Running' && (selectedGenre ? m.genre === selectedGenre : true)
+        m => m.status === 'Currently Running' && (selectedGenre ? m.genre === selectedGenre : true)
     );
 
     const comingSoon = movies.filter(
