@@ -5,8 +5,9 @@ import { Link } from 'react-router-dom';
 function MovieDisplay({ movie }) {
     return (
         <div className={styles.movieDisplay}>
-            <img src={movie.poster} alt={movie.title} className={styles.poster} />
             <Link to={`/movie/${movie.id}`} className={styles.movieTitle}>
+            <img src={movie.poster} alt={movie.title} className={styles.poster} />
+            
                 {movie.title}
             </Link>
 
