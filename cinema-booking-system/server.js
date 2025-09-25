@@ -3,13 +3,13 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 
-const Movie = require("./src/models/Movie"); // your Movie schema
+const Movie = require("./src/models/Movie");
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// Default showtimes if a movie has none
+// Default showtimes
 const DEFAULT_SHOWTIMES = [
   { time: "2:00 PM" },
   { time: "5:00 PM" },
@@ -49,7 +49,7 @@ app.get("/api/movies/:id", async (req, res) => {
   }
 });
 
-// Create a new movie (optional for testing)
+// Create a new movie (testing)
 app.post("/api/movies", async (req, res) => {
   try {
     const newMovie = new Movie(req.body);
