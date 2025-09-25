@@ -9,7 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Default showtimes
+// Default showtimes if a movie has none
 const DEFAULT_SHOWTIMES = [
   { time: "2:00 PM" },
   { time: "5:00 PM" },

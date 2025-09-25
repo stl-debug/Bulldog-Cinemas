@@ -48,3 +48,24 @@
     justify-content: space-around;
     font-size: 0.9rem;
 }
+
+.bioSection {
+    background-color: #1c1c1c;  
+    padding: 2rem;
+    border-radius: 8px;
+    margin: 2rem auto;          
+    max-width: 1200px;          
+    text-align: center;
+}
+
+.bioSection h2 {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    color: #ffd700;
+}
+
+.bioSection p {
+    font-size: 1.1rem;
+    line-height: 1.5;
+    color: #ccc;
+}

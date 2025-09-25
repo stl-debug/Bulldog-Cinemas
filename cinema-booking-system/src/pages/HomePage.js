@@ -18,6 +18,16 @@ function HomePage() {
     return (
         <div>
             <Header />
+
+            <section className={styles.bioSection}>
+                <h2>Welcome to Bulldog Cinemas!</h2>
+                <p>
+                    At Bulldog Cinemas, you can experience the latest blockbusters 
+                    in a comfortable, state-of-the-art theater! Grab your popcorn and enjoy a 
+                    cinematic experience like no other!
+                </p>
+            </section>
+
             <div className={styles.container}>
                 <MovieList movies={movies} genre={selectedGenre} />
             </div>
@@ -26,3 +36,4 @@ function HomePage() {
 }
 
 export default HomePage;
+

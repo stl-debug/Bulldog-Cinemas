@@ -1,8 +1,12 @@
 body {
-  background-color: #111; /* dark gray/black background */
-  color: #fff; /* default text white */
+  background-color: #111; 
+  color: #fff; 
   margin: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 0 2rem;      
+  max-width: 1200px;      
+  margin: 0 auto; 
+
 }
 
 a {
