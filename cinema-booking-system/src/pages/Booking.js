@@ -1,12 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from 'react-router-dom';
+import styles from '../styles/Booking.module.css';
 
 function BookingPage() {
-    const {movieId, time} = useParams();
+    const { movieId, time } = useParams();
+    const location = useLocation();
+    const searchParams = new URLSearchParams(location.search);
+    const date = searchParams.get("date");
+
+    const [movieTitle, setMovieTitle] = useState('');
     const rows = ["A", "B", "C", "D"];
     const seatsPerRow = 8;
     const [selectedSeats, setSelectedSeats] = useState([]);
+
+    useEffect(() => {
+        fetch(`http://localhost:5001/api/movies/${movieId}`)
+            .then(res => res.json())
+            .then(data => setMovieTitle(data.title))
+            .catch(err => console.error(err));
+    }, [movieId]);
 
     const handleSeatClick = (seatId) => {
         if (selectedSeats.includes(seatId)) {
@@ -15,16 +28,30 @@ function BookingPage() {
             setSelectedSeats([...selectedSeats, seatId]);
         }
     };
+
+    const formattedDate = date
+  ? new Date(date + 'T00:00').toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+  : '';
+
     return (
         <div>
             <Header />
-            <div >
-                <h2>Booking</h2>
-                <h3>Movie ID: {movieId}</h3>
+            <div className={styles.bookingContainer}>
+                <h1>Booking</h1>
+                <h3>Movie: {movieTitle}</h3>
+                <h3>Date: {formattedDate}</h3>
                 <h3>Time: {time}</h3>
-                <div style={{ marginTop: "20px" }}>
-                    <h3>Select Your Seats</h3>
-                    <div style={{ display: "grid", gridTemplateColumns: `repeat(${seatsPerRow}, auto)`, gap: "10px", marginBottom: "20px" }}>
+
+                <div style={{ marginTop: "30px" }}>
+                    <h2 className={styles.sectionTitle}>Select Your Seats</h2>
+
+                    <div className={styles.screen}>Movie Screen Here</div>
+
+                    <div className={styles.seatsGrid}>
                         {rows.map(row =>
                             Array.from({ length: seatsPerRow }, (_, i) => {
                                 const seatId = `${row}${i + 1}`;
@@ -33,12 +60,7 @@ function BookingPage() {
                                     <button
                                         key={seatId}
                                         onClick={() => handleSeatClick(seatId)}
-                                        style={{
-                                            padding: "10px",
-                                            backgroundColor: isSelected ? "green" : "lightgray",
-                                            border: "1px solid black",
-                                            cursor: "pointer"
-                                        }}
+                                        className={`${styles.seat} ${isSelected ? styles.selected : ''}`}
                                     >
                                         {seatId}
                                     </button>
@@ -47,16 +69,16 @@ function BookingPage() {
                         )}
                     </div>
 
-                    <h3 style={{ marginTop: "20px" }}>Select Ticket Type</h3>
-                    <select>
+                    <h2 className={styles.sectionTitle}>Select Ticket Type</h2>
+                    <select className={styles.ticketDropdown}>
                         <option value="">--Choose ticket type--</option>
-                        <option value="child">Child</option>
-                        <option value="adult">Adult</option>
-                        <option value="senior">Senior</option>
+                        <option value="child">Child ($8.00)</option>
+                        <option value="adult">Adult ($15.00)</option>
+                        <option value="senior">Senior ($10.00)</option>
                     </select>
 
-                    <button style={{ display: "block", marginTop: "20px" }}>
-                        Confirm Booking {selectedSeats.length > 0 && `(Seats: ${selectedSeats.join(", ")})`}
+                    <button className={styles.proceedButton}>
+                        Proceed to Payment {selectedSeats.length > 0 && `(Seats: ${selectedSeats.join(", ")})`}
                     </button>
                 </div>
             </div>

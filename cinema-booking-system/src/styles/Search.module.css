@@ -1,19 +1,35 @@
 .searchContainer {
     padding: 2rem;
 }
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    align-items: center;
+}
+
 input {
     padding: 0.5rem;
     font-size: 1rem;
-    margin-right: 1rem;
+    flex: 1 1 200px;
 }
-button {
-    padding: 0.5rem 1rem;
+
+.genreSelect {
+    padding: 0.5rem;
     font-size: 1rem;
-    margin-right: 2rem;
 }
-ul {
+
+.resultsGrid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    justify-content: flex-start;
+}
+
+.noResults {
+    color: #ccc;
     margin-top: 1rem;
-}
-li {
-    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
 }

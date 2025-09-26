@@ -13,7 +13,8 @@ function HomePage() {
             .catch(err => console.error(err));
     }, []);
 
-    const [selectedGenre, setSelectedGenre] = useState("");
+    const [selectedGenre] = useState("");
+
 
     return (
         <div>

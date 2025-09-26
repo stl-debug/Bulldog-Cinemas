@@ -12,17 +12,13 @@ function MovieDisplay({ movie }) {
                 {movie.title}
             </Link>
 
-            {/* turn showtimes into links to booking page */}
+           
             {movie.status === 'Currently Running' && (
     <div className={styles.showtimes}>
         {(movie.showtimes && movie.showtimes.length ? movie.showtimes : ['2:00 PM', '5:00 PM', '8:00 PM']).map((show, i) => (
-            <Link
-                key={i}
-                to={`/booking/${movie._id}/${encodeURIComponent(show.time || show)}`}
-                className={styles.showtimeLink}
-            >
+            <span key={i} className={styles.showtimeText}>
                 {show.time || show}
-            </Link>
+            </span>
         ))}
     </div>
 )}

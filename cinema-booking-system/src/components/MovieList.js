@@ -41,7 +41,7 @@ function MovieList() {
                 onChange={(e) => setSelectedGenre(e.target.value)}
             />
 
-            <h2>Currently Running</h2>
+            <h2>Now Playing</h2>
             <div className={styles.grid}>
                 {currentlyRunning.map(movie => (
                     <MovieDisplay 

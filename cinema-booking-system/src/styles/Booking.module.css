@@ -1,0 +1,55 @@
+.bookingContainer {
+    padding: 2rem;
+}
+
+.sectionTitle {
+    margin-top: 30px;
+    margin-bottom: 10px;
+}
+
+.screen {
+    width: 100%;
+    height: 40px;
+    background-color: #ccc;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    color: #333;
+}
+
+.seatsGrid {
+    display: grid;
+    grid-template-columns: repeat(8, auto);
+    gap: 10px;
+    margin-bottom: 30px;
+}
+
+.seat {
+    padding: 10px;
+    background-color: lightgray;
+    border: 1px solid black;
+    cursor: pointer;
+}
+
+.seat.selected {
+    background-color: green;
+}
+
+.ticketDropdown {
+    padding: 8px;
+    font-size: 1rem;
+    margin-bottom: 20px;
+}
+
+.proceedButton {
+    padding: 10px 20px;
+    background-color: #e50914; /* same red as showtime buttons */
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    display: block;
+}

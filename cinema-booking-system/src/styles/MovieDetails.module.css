@@ -2,14 +2,21 @@
     display: flex;
     padding: 2rem;
     gap: 2rem;
+    align-items: flex-start;
 }
 .poster {
     width: 300px;
     height: auto;
     border-radius: 8px;
+    flex-shrink: 0;
+    object-fit: cover;
 }
 .details {
     max-width: 600px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+
 }
 .details h2 {
     margin-bottom: 1rem;
@@ -19,3 +26,59 @@
     padding-left: 0;
 }
 
+.sidebar {
+    width: 250px;
+    background-color: #1c1c1c;
+    color: #fff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    
+}
+
+.sidebar h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #ffd700;
+}
+
+.sidebar p {
+    margin: 0.5rem 0;
+}
+
+.sidebar ul {
+    padding-left: 1rem;
+    margin-top: 0.5rem;
+}
+
+.rightPanel {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    gap: 2rem;
+    align-items: stretch; 
+}
+
+.showtimes {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.showtimeButton {
+    background-color: #b22222; 
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.showtimeButton:hover {
+    background-color: #8a1a1a; 
+}
