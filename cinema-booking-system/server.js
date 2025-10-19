@@ -68,6 +68,136 @@ mongoose.connection.once("open", async () => {
   console.log("Movies in DB:", count);
 });
 
+app.get("/api/movies", async (req, res) => {
+  try {
+    const movies = await Movie.find({}).lean();
+    res.json(movies);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ------------------- User / Auth Routes ------------------- */
+
+// send confirmation email
+async function sendConfirmationEmail(userEmail, token) {
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    }
+  });
+
+  const url = `${process.env.CLIENT_URL}/confirm/${token}`;
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to: userEmail,
+    subject: "Confirm your account",
+    html: `Click <a href="${url}">here</a> to confirm your account.`
+  });
+}
+
+// Register
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const { firstName, lastName, email, password, promotions } = req.body;
+
+    // Check if user exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return res.status(400).json({ error: "User already exists" });
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = new User({
+      firstName,
+      lastName,
+      email,
+      password: hashedPassword,
+      promotions,
+      status: "Inactive",
+      role: "user" // default
+    });
+
+    await newUser.save();
+
+    // Generate confirmation token
+    const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, { expiresIn: "1d" });
+
+    // Send confirmation email
+    await sendConfirmationEmail(email, token);
+
+    res.status(201).json({ message: "User registered. Please confirm your email." });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Confirm email
+app.get("/api/auth/confirm/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    user.status = "Active";
+    await user.save();
+
+    res.json({ message: "Account confirmed. You can now log in." });
+  } catch (err) {
+    res.status(400).json({ error: "Invalid or expired token" });
+  }
+});
+
+// Login
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if (user.status !== "Active") return res.status(403).json({ error: "Please confirm your email" });
+
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(401).json({ error: "Incorrect password" });
+
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1d" });
+
+    res.json({ token, user: { id: user._id, email: user.email, role: user.role } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Edit profile (authenticated)
+app.put("/api/auth/profile/:id", async (req, res) => {
+  try {
+    const { firstName, lastName, password, promotions } = req.body;
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (firstName) user.firstName = firstName;
+    if (lastName) user.lastName = lastName;
+    if (password) user.password = await bcrypt.hash(password, 10);
+    if (promotions !== undefined) user.promotions = promotions;
+
+    await user.save();
+    res.json({ message: "Profile updated", user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Logout (just client-side token removal)
+app.post("/api/auth/logout", (req, res) => {
+  res.json({ message: "Logged out" });
+});
+
+
 app.get("/api/test", (req, res) => {
     res.send("API is working");
 });
