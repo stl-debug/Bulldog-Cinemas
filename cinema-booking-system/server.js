@@ -95,7 +95,7 @@ async function sendConfirmationEmail(userEmail, token) {
     }
   });
 
-  const url = `${process.env.CLIENT_URL}/confirm/${token}`;
+const url = `${process.env.BACKEND_URL}/api/auth/confirm/${token}`;
   await transporter.sendMail({
     from: process.env.EMAIL_FROM,
     to: userEmail,
@@ -143,20 +143,25 @@ app.post("/api/auth/register", async (req, res) => {
 // Confirm email
 app.get("/api/auth/confirm/:token", async (req, res) => {
   try {
-    const { token } = req.params;
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("Token received:", req.params.token);
+    const decoded = jwt.verify(req.params.token, process.env.JWT_SECRET);
+    console.log("Decoded token:", decoded);
 
     const user = await User.findById(decoded.id);
-    if (!user) return res.status(404).json({ error: "User not found" });
+    console.log("User found:", user);
+
+    if (!user) return res.status(404).send("User not found");
 
     user.status = "Active";
     await user.save();
 
-    res.json({ message: "Account confirmed. You can now log in." });
+    res.redirect(`${process.env.FRONTEND_URL}/confirmed`);
   } catch (err) {
-    res.status(400).json({ error: "Invalid or expired token" });
+    console.error(err);
+    res.status(400).send("Invalid or expired token");
   }
 });
+
 
 // Login
 app.post("/api/auth/login", async (req, res) => {
