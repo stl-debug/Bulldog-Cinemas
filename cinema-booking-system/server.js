@@ -2,8 +2,13 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
+require("dotenv").config();
 
 const Movie = require("./src/models/Movie");
+const User = require("./src/models/User"); 
 const app = express();
 
 app.use(cors());
@@ -115,7 +120,7 @@ app.post("/api/auth/register", async (req, res) => {
       firstName,
       lastName,
       email,
-      password: hashedPassword,
+      passwordHash: hashedPassword,
       promotions,
       status: "Inactive",
       role: "user" // default

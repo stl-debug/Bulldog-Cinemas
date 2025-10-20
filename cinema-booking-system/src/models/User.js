@@ -2,20 +2,6 @@ const mongoose = require("mongoose");
 const { Schema } = mongoose;
 const bcrypt = require("bcrypt");
 
-const UserSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-  passwordHash: { type: String, required: true },
-  firstName: String,
-  lastName: String,
-  status: { type: String, enum: ["Active", "Inactive"], default: "Inactive" }, 
-  promotions: { type: Boolean, default: false },
-  addresses: { type: [AddressSchema], default: [] },
-  paymentCards: { type: [PaymentCardSchema], default: [] }, 
-  emailConfirmToken: String,
-  resetPasswordToken: String,
-  resetPasswordExpires: Date,
-  role: { type: String, enum: ["user","admin"], default: "user" },
-});
 
 const PaymentCardSchema = new mongoose.Schema({
     cardNumberEncrypted: {type: String, required: true},
@@ -32,6 +18,21 @@ const AddressSchema = new mongoose.Schema({
     state: String,
     zip: String,
     country: String,
+});
+
+const UserSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  passwordHash: { type: String, required: true },
+  firstName: String,
+  lastName: String,
+  status: { type: String, enum: ["Active", "Inactive"], default: "Inactive" }, 
+  promotions: { type: Boolean, default: false },
+  addresses: { type: [AddressSchema], default: [] },
+  paymentCards: { type: [PaymentCardSchema], default: [] }, 
+  emailConfirmToken: String,
+  resetPasswordToken: String,
+  resetPasswordExpires: Date,
+  role: { type: String, enum: ["user","admin"], default: "user" },
 });
 
 module.exports = mongoose.model("User", UserSchema);
