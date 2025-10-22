@@ -1,6 +1,6 @@
 // server.js
 const express = require("express");
-const mongoose = require("mongoose");
+const mongoose = require("mongoose");// send confirmation email
 const cors = require("cors");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
@@ -10,16 +10,54 @@ require("dotenv").config();
 const Movie = require("./src/models/Movie");
 const User = require("./src/models/User"); 
 const app = express();
-
-app.use(cors());
 app.use(express.json());
+app.use(cors());
 
-// Default showtimes
-const DEFAULT_SHOWTIMES = [
-  { time: "2:00 PM" },
-  { time: "5:00 PM" },
-  { time: "8:00 PM" },
-];
+async function sendConfirmationEmail(userEmail, token) {
+  const transporter = nodemailer.createTransporter({
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    }
+  });
+
+const url = `${process.env.BACKEND_URL}/api/auth/confirm/${token}`;
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to: userEmail,
+    subject: "Confirm your account",
+    html: `Click <a href="${url}">here</a> to confirm your account.`
+  });
+}
+
+// send password reset email
+async function sendPasswordResetEmail(userEmail, token) {
+  const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  }
+});
+
+
+  const url = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to: userEmail,
+    subject: "Reset your password",
+    html: `
+      <h2>Password Reset Request</h2>
+      <p>You requested a password reset. Click the link below to reset your password:</p>
+      <p><a href="${url}">Reset Password</a></p>
+      <p>This link will expire in 1 hour.</p>
+      <p>If you didn't request this, please ignore this email.</p>
+    `
+  });
+}
 
 // Connect to CES database
 mongoose
@@ -86,14 +124,14 @@ app.get("/api/movies", async (req, res) => {
 
 // send confirmation email
 async function sendConfirmationEmail(userEmail, token) {
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    }
-  });
+ const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  }
+});
 
 const url = `${process.env.BACKEND_URL}/api/auth/confirm/${token}`;
   await transporter.sendMail({
@@ -172,13 +210,83 @@ app.post("/api/auth/login", async (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found" });
     if (user.status !== "Active") return res.status(403).json({ error: "Please confirm your email" });
 
-    const valid = await bcrypt.compare(password, user.password);
+    const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ error: "Incorrect password" });
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1d" });
 
     res.json({ token, user: { id: user._id, email: user.email, role: user.role } });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Request password reset
+app.post("/api/auth/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Generate reset token
+    const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    
+    // Save reset token and expiration to database
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour from now
+    await user.save();
+
+    // Send reset email
+    await sendPasswordResetEmail(email, resetToken);
+
+    res.json({ message: "Password reset email sent" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reset password
+app.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ error: "Token and password are required" });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Check if token matches and hasn't expired
+    if (user.resetPasswordToken !== token) {
+      return res.status(400).json({ error: "Invalid reset token" });
+    }
+
+    if (user.resetPasswordExpires < new Date()) {
+      return res.status(400).json({ error: "Reset token has expired" });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Update user password and clear reset token
+    user.passwordHash = hashedPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    res.json({ message: "Password reset successful" });
+  } catch (err) {
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(400).json({ error: "Invalid reset token" });
+    }
+    if (err.name === 'TokenExpiredError') {
+      return res.status(400).json({ error: "Reset token has expired" });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -192,7 +300,7 @@ app.put("/api/auth/profile/:id", async (req, res) => {
 
     if (firstName) user.firstName = firstName;
     if (lastName) user.lastName = lastName;
-    if (password) user.password = await bcrypt.hash(password, 10);
+    if (password) user.passwordHash = await bcrypt.hash(password, 10);
     if (promotions !== undefined) user.promotions = promotions;
 
     await user.save();
@@ -206,6 +314,7 @@ app.put("/api/auth/profile/:id", async (req, res) => {
 app.post("/api/auth/logout", (req, res) => {
   res.json({ message: "Logged out" });
 });
+
 
 
 app.get("/api/test", (req, res) => {
