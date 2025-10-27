@@ -1,4 +1,5 @@
-const express = require('express');
+// src/middleware/auth.js (or wherever you keep it)
+const express = require("express");
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
@@ -12,7 +13,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'devsecret';
 
 // Helper to generate random tokens
 function generateToken() {
-    return crypto.randomBytes(32).toString('hex');
+  return crypto.randomBytes(32).toString("hex");
 }
 
 /* ------------------------- REGISTER ------------------------- */
