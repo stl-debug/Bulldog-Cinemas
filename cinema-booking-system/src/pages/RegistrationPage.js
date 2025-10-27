@@ -1,17 +1,23 @@
 // src/pages/RegistrationPage.js
 import React, { useState } from 'react';
-import styles from '../styles/ResistrationPage.module.css';
+import { useNavigate } from 'react-router-dom';
+import styles from '../styles/RegistrationPage.module.css';
+
+// Works in Vite or CRA; falls back to local backend server
+const API_BASE =
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
+  (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_URL) ||
+  'http://localhost:5001';
 
 export default function RegistrationPage() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     firstName: '',
-    lastName:  '',
-    email:     '',
-    password:  '',
+    lastName: '',
+    email: '',
+    password: '',
     confirmPassword: '',
-    phone:     '',
     promoOptIn: false,
-    company:   '' // honeypot (should remain empty)
   });
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -19,7 +25,7 @@ export default function RegistrationPage() {
 
   const onChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm(p => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
+    setForm((p) => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
     if (msg.text) setMsg({ type: '', text: '' });
   };
 
@@ -31,7 +37,6 @@ export default function RegistrationPage() {
     }
     if (form.password !== form.confirmPassword) return 'Passwords do not match.';
     if (!agree) return 'You must agree to the terms.';
-    if (form.company.trim()) return 'Invalid submission.'; // honeypot caught
     return '';
   };
 
@@ -39,10 +44,38 @@ export default function RegistrationPage() {
     e.preventDefault();
     const v = validate();
     if (v) return setMsg({ type: 'error', text: v });
+
     setLoading(true);
-    await new Promise(r => setTimeout(r, 500)); // demo latency only
-    setForm(p => ({ ...p, password: '', confirmPassword: '' }));
-    setLoading(false);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Your backend expects: firstName, lastName, email, password, promotions
+        body: JSON.stringify({
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          email: form.email.trim().toLowerCase(),
+          password: form.password,
+          promotions: !!form.promoOptIn,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      
+      if (!res.ok) {
+        console.error('Registration error:', data);
+        setMsg({ type: 'error', text: data.error || data.message || `Registration failed: ${res.status} ${res.statusText}` });
+      } else {
+        // Account created in MongoDB as inactive, redirect to home
+        console.log('Registration successful');
+        navigate('/');
+      }
+    } catch (err) {
+      console.error('Network error:', err);
+      setMsg({ type: 'error', text: `Network error: ${err.message}` });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -92,17 +125,6 @@ export default function RegistrationPage() {
           required
         />
 
-        <label className={styles.label} htmlFor="phone">Phone (optional)</label>
-        <input
-          className={styles.input}
-          id="phone"
-          name="phone"
-          type="tel"
-          value={form.phone}
-          onChange={onChange}
-          placeholder="(404) 555-1234"
-        />
-
         <label className={styles.label} htmlFor="password">Password *</label>
         <input
           className={styles.input}
@@ -114,7 +136,7 @@ export default function RegistrationPage() {
           minLength={8}
           required
         />
-        <div className={styles.helper}>At least 8 characters and include letters & numbers.</div>
+        <div className={styles.helper}>At least 8 characters and include letters &amp; numbers.</div>
 
         <label className={styles.label} htmlFor="confirmPassword">Confirm password *</label>
         <input
@@ -127,19 +149,6 @@ export default function RegistrationPage() {
           minLength={8}
           required
         />
-
-        {/* Honeypot (hidden) */}
-        <div className={styles.honeypot} aria-hidden="true">
-          <label htmlFor="company">Company</label>
-          <input
-            id="company"
-            name="company"
-            value={form.company}
-            onChange={onChange}
-            tabIndex={-1}
-            autoComplete="off"
-          />
-        </div>
 
         <label className={styles.checkboxRow}>
           <input
@@ -155,7 +164,7 @@ export default function RegistrationPage() {
           <input
             type="checkbox"
             checked={agree}
-            onChange={() => setAgree(a => !a)}
+            onChange={() => setAgree((a) => !a)}
             required
           />
           <span>I agree to the Terms and Privacy Policy</span>

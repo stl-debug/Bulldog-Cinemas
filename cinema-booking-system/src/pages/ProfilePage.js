@@ -32,6 +32,7 @@ import styles from '../styles/LoginPage.module.css';
  *   ]
  * }
  */
+
 export default function ProfilePage() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -39,7 +40,7 @@ export default function ProfilePage() {
   const [error, setError] = useState('');
 
   // Use REACT_APP_API_URL if provided; otherwise same-origin
-  const API_BASE = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL : '';
+  const API_BASE = process.env.REACT_APP_API_URL || '';
 
   useEffect(() => {
     let isMounted = true;
@@ -54,7 +55,6 @@ export default function ProfilePage() {
         });
 
         if (res.status === 401) {
-          // Not authenticated → redirect to login
           navigate('/login');
           return;
         }
@@ -67,16 +67,12 @@ export default function ProfilePage() {
         const data = await res.json();
         if (!isMounted) return;
 
-        // Defensive mapping to avoid undefined access
+
         setUser({
           firstName: data.firstName ?? '',
           lastName: data.lastName ?? '',
           email: data.email ?? '',
-          phone: data.phone ?? '',
-          promoOptIn: !!data.promoOptIn,
-          status: data.status ?? '',
-          address: data.address ?? null,
-          cards: Array.isArray(data.cards) ? data.cards.slice(0, 4) : []
+          status: data.status ?? ''
         });
       } catch (e) {
         if (!isMounted) return;
@@ -89,12 +85,6 @@ export default function ProfilePage() {
     loadProfile();
     return () => { isMounted = false; };
   }, [API_BASE, navigate]);
-
-  const formatAddress = (addr) => {
-    if (!addr) return [];
-    const cityLine = [addr.city, addr.state, addr.zip].filter(Boolean).join(', ');
-    return [addr.line1, addr.line2, cityLine, addr.country].filter(Boolean);
-  };
 
   if (loading) {
     return (
@@ -134,7 +124,6 @@ export default function ProfilePage() {
   }
 
   const fullName = `${user.firstName} ${user.lastName}`.trim();
-  const addressLines = formatAddress(user.address);
 
   return (
     <div className={styles.loginContainer}>
@@ -147,53 +136,6 @@ export default function ProfilePage() {
           <div><strong>Name:</strong> {fullName || '—'}</div>
           <div><strong>Email (read-only):</strong> {user.email || '—'}</div>
           <div><strong>Status:</strong> {user.status || '—'}</div>
-        </section>
-
-        {/* Contact section */}
-        <section style={{ marginBottom: 16 }}>
-          <h3 style={{ margin: '0 0 8px' }}>Contact</h3>
-          <div><strong>Phone:</strong> {user.phone || '—'}</div>
-        </section>
-
-        {/* Preferences */}
-        <section style={{ marginBottom: 16 }}>
-          <h3 style={{ margin: '0 0 8px' }}>Preferences</h3>
-          <div>
-            <strong>Promotions:</strong> {user.promoOptIn ? 'Registered' : 'Not registered'}
-          </div>
-        </section>
-
-        {/* Billing Address */}
-        <section style={{ marginBottom: 16 }}>
-          <h3 style={{ margin: '0 0 8px' }}>Billing Address</h3>
-          {addressLines.length > 0 ? (
-            <div>
-              {addressLines.map((ln, idx) => (
-                <div key={idx}>{ln}</div>
-              ))}
-            </div>
-          ) : (
-            <div>None on file</div>
-          )}
-        </section>
-
-        {/* Payment Methods */}
-        <section style={{ marginBottom: 8 }}>
-          <h3 style={{ margin: '0 0 8px' }}>Payment Methods</h3>
-          {Array.isArray(user.cards) && user.cards.length > 0 ? (
-            <ul style={{ paddingLeft: 18, margin: 0 }}>
-              {user.cards.map((c, i) => (
-                <li key={i}>
-                  {c.brand || 'Card'} •••• {c.last4 || '0000'} (exp {c.expMonth || 'MM'}/{c.expYear || 'YY'})
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div>No saved cards</div>
-          )}
-          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>
-            You can store up to <strong>4</strong> payment cards.
-          </div>
         </section>
 
         <div style={{ marginTop: 16, display: 'flex', gap: 12 }}>
