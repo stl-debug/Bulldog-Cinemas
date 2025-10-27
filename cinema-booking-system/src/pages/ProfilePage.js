@@ -53,6 +53,16 @@ export default function ProfilePage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState(null);
 
+  // password change
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordMsg, setPasswordMsg] = useState(null);
+
   // auth token
   const token = useMemo(() => {
     try {
@@ -287,6 +297,66 @@ export default function ProfilePage() {
     }));
   }
 
+  function validatePassword() {
+    if (!passwordForm.oldPassword) return "Current password is required";
+    if (passwordForm.newPassword.length < 8) return "New password must be at least 8 characters";
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) return "Passwords do not match";
+    return null;
+  }
+
+  async function handleChangePassword(e) {
+    e.preventDefault();
+    setPasswordMsg(null);
+    
+    const validation = validatePassword();
+    if (validation) {
+      setPasswordMsg({ type: "error", text: validation });
+      return;
+    }
+
+    if (!me?.id) {
+      setPasswordMsg({ type: "error", text: "User ID not found" });
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          password: passwordForm.newPassword,
+          oldPassword: passwordForm.oldPassword
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to change password");
+      }
+
+      setPasswordMsg({ type: "success", text: "Password changed successfully" });
+      setChangingPassword(false);
+      setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (e) {
+      setPasswordMsg({ type: "error", text: e.message });
+    } finally {
+      setSavingPassword(false);
+    }
+  }
+
+  function handlePasswordChange(e) {
+    const { name, value } = e.target;
+    setPasswordForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  }
+
   /* ------------------------- render ------------------------- */
   if (!token) {
     return (
@@ -420,6 +490,98 @@ export default function ProfilePage() {
                 {profileMsg && (
                   <div className={profileMsg.type === "error" ? styles.msgError : styles.msgSuccess}>
                     {profileMsg.text}
+                  </div>
+                )}
+              </form>
+            )}
+          </section>
+
+          {/* Password Change */}
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Change Password</h3>
+            {!changingPassword ? (
+              <>
+                <p className={styles.subtle}>Update your account password</p>
+                <button
+                  type="button"
+                  onClick={() => setChangingPassword(true)}
+                  className={styles.button}
+                  style={{ marginTop: '12px' }}
+                >
+                  Change Password
+                </button>
+                {passwordMsg && (
+                  <div className={passwordMsg.type === "error" ? styles.msgError : styles.msgSuccess}>
+                    {passwordMsg.text}
+                  </div>
+                )}
+              </>
+            ) : (
+              <form onSubmit={handleChangePassword} className={styles.form}>
+                <label className={styles.label}>
+                  Current Password
+                  <input
+                    type="password"
+                    name="oldPassword"
+                    value={passwordForm.oldPassword}
+                    onChange={handlePasswordChange}
+                    className={styles.input}
+                    placeholder="Enter current password"
+                    required
+                  />
+                </label>
+
+                <label className={styles.label}>
+                  New Password
+                  <input
+                    type="password"
+                    name="newPassword"
+                    value={passwordForm.newPassword}
+                    onChange={handlePasswordChange}
+                    className={styles.input}
+                    placeholder="Enter new password (min 8 characters)"
+                    minLength={8}
+                    required
+                  />
+                </label>
+
+                <label className={styles.label}>
+                  Confirm New Password
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    value={passwordForm.confirmPassword}
+                    onChange={handlePasswordChange}
+                    className={styles.input}
+                    placeholder="Confirm new password"
+                    required
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={savingPassword}
+                  className={styles.button}
+                >
+                  {savingPassword ? "Changing..." : "Change Password"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChangingPassword(false);
+                    setPasswordMsg(null);
+                    setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+                  }}
+                  className={styles.button}
+                  style={{ backgroundColor: 'gray', marginLeft: '8px' }}
+                >
+                  Cancel
+                </button>
+
+                {passwordMsg && (
+                  <div className={passwordMsg.type === "error" ? styles.msgError : styles.msgSuccess}>
+                    {passwordMsg.text}
                   </div>
                 )}
               </form>

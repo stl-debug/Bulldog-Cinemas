@@ -242,13 +242,22 @@ app.get("/api/auth/profile", auth, async (_req, res) => {
 
 app.put("/api/auth/profile", auth, async (req, res) => {
   try {
-    const { firstName, lastName, password, promotions, address } = req.body;
+    const { firstName, lastName, password, oldPassword, promotions, address } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: "User not found" });
     if (firstName !== undefined) user.firstName = firstName;
     if (lastName !== undefined) user.lastName = lastName;
     if (typeof promotions === "boolean") user.promotions = promotions;
+    // Handle password change - require old password
     if (password) {
+      if (!oldPassword) {
+        return res.status(400).json({ error: "Old password is required to change password" });
+      }
+      // Verify old password
+      const valid = await bcrypt.compare(oldPassword, user.passwordHash);
+      if (!valid) {
+        return res.status(401).json({ error: "Incorrect old password" });
+      }
       user.passwordHash = await bcrypt.hash(password, 10);
       user.passwordChangedAt = new Date();
     }
