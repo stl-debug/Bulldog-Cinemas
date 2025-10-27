@@ -13,6 +13,7 @@ import { UserProvider } from './context/UserContext';
 import ReviewBookingPage from "./pages/ReviewBookingPage";
 import AdminHome from './pages/AdminHome';
 import OrderConfirmationPage from './pages/OrderConfirmationPage';
+import RegistrationPage from './pages/RegistrationPage';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
           <Route path="/admin-home" element={<AdminHome />} />
           <Route path="/review-booking" element={<ReviewBookingPage />} />
           <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
+          <Route path="/signup" element={ <RegistrationPage />} />
         </Routes>
         </div>
       </Router>

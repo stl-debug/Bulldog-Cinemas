@@ -90,7 +90,13 @@ function LoginPage() {
 
           <div className={styles.links}>
             <Link to="/forgot-password" className={styles.link}>Forgot Password?</Link>
-            <Link to="/signup" className={styles.link}>Create an Account</Link>
+            <button
+              type="button"
+              className={styles.link}
+              onClick={() => navigate('/signup')}
+            >
+              Create an Account
+            </button>
           </div>
         </form>
       </div>

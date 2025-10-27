@@ -27,6 +27,7 @@ function Header() {
 
           {user ? (
             <>
+              <Link to="/profile" className={styles.navLink}>Profile</Link>
               <span onClick={handleLogout} className={styles.navLink} style={{ cursor: 'pointer' }}> Logout </span>
               <span className={styles.welcome}>
                 Welcome, {user.firstName || user.email}
