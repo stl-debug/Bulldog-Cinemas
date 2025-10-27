@@ -440,17 +440,6 @@ export default function ProfilePage() {
                   />
                 </label>
 
-                <label className={styles.label}>
-                  Email (read-only)
-                  <input
-                    type="email"
-                    value={me.email}
-                    disabled
-                    className={styles.input}
-                    style={{ backgroundColor: '#f5f5f5' }}
-                  />
-                </label>
-
                 <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}>
                   <input
                     type="checkbox"
