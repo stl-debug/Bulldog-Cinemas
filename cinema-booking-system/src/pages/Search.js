@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Header from '../components/Header';
 import GenreFilter from '../components/GenreFilter';
 import MovieDisplay from '../components/MovieDisplay';
 import styles from '../styles/Search.module.css';
@@ -35,7 +34,6 @@ function SearchPage() {
 
     return (
         <div>
-            <Header />
             <div className={styles.searchContainer}>
                 <div className={styles.controls}>
                     <input

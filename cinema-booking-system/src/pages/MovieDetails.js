@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import Header from '../components/Header';
 import styles from '../styles/MovieDetails.module.css';
 
 function MovieDetails() {
@@ -34,7 +33,6 @@ function MovieDetails() {
 
     return (
         <div>
-            <Header />
 
             <div className={styles.container}>
 

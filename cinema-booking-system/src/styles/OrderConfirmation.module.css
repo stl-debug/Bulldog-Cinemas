@@ -1,0 +1,37 @@
+.container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 80vh;
+    text-align: center;
+  }
+  
+  .card {
+    background-color: #000;
+    color: white;
+    padding: 2rem 3rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+  
+  .card h1 {
+    color: #ffd700;
+    margin-bottom: 1rem;
+  }
+  
+  .card p {
+    margin-bottom: 1rem;
+  }
+  
+  .homeLink {
+    color: #ff4c4c;
+    text-decoration: none;
+    font-weight: bold;
+    margin-top: 1rem;
+    display: inline-block;
+  }
+  
+  .homeLink:hover {
+    color: #ff6666;
+  }
+  

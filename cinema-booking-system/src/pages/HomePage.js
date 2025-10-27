@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import Header from '../components/Header';
 import MovieList from '../components/MovieList';
 import styles from '../styles/HomePage.module.css';
+
 
 function HomePage() {
     const [movies, setMovies] = useState([]);
@@ -13,12 +13,12 @@ function HomePage() {
             .catch(err => console.error(err));
     }, []);
 
+
     const [selectedGenre] = useState("");
 
 
     return (
         <div>
-            <Header />
 
             <section className={styles.bioSection}>
                 <h2>Welcome to Bulldog Cinemas!</h2>

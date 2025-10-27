@@ -1,11 +1,22 @@
-body {
+body, html, #root {
   background-color: #111; 
-  color: #fff; 
-  margin: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   padding: 0 2rem;      
   max-width: 1200px;      
   margin: 0 auto; 
+  height: 100%;
+  background: linear-gradient(180deg, #111, #440000);
+  background-attachment: fixed;
+  background-size: cover;
+  color: #fff;
+  font-family: 'Poppins', sans-serif;
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center; 
+  justify-content: flex-start; 
+  box-sizing: border-box;
 
 }
 
@@ -23,8 +34,6 @@ a {
   pointer-events: none;
 }
 
-
-
 .App-header {
   background-color: #282c34;
   min-height: 100vh;
@@ -40,4 +49,10 @@ a {
   color: #61dafb;
 }
 
-
+.appContainer {
+  width: 100%;
+  max-width: 1200px; 
+  margin: 0 auto; 
+  padding: 1rem;
+  box-sizing: border-box;
+}
