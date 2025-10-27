@@ -1,4 +1,6 @@
+// src/pages/ProfilePage.js
 import React, { useEffect, useMemo, useState } from "react";
+import styles from "../styles/ProfilePage.module.css";
 
 const API_BASE =
   process.env.REACT_APP_API_BASE ||
@@ -11,17 +13,24 @@ function maskLast4(last4) {
 }
 
 export default function ProfilePage() {
+  // profile
   const [me, setMe] = useState(null);
   const [loadingMe, setLoadingMe] = useState(true);
   const [err, setErr] = useState(null);
 
+  // cards
   const [cards, setCards] = useState([]);
+  const [deletingId, setDeletingId] = useState(null);
+
+  // form
+  const [cardHolderName, setCardHolderName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [expMonth, setExpMonth] = useState("");
   const [expYear, setExpYear] = useState("");
   const [savingCard, setSavingCard] = useState(false);
   const [cardMsg, setCardMsg] = useState(null);
 
+  // auth token
   const token = useMemo(() => {
     try {
       return localStorage.getItem("token");
@@ -30,6 +39,7 @@ export default function ProfilePage() {
     }
   }, []);
 
+  /* ------------------------- data loaders ------------------------- */
   async function loadMe() {
     setLoadingMe(true);
     setErr(null);
@@ -37,7 +47,10 @@ export default function ProfilePage() {
       const res = await fetch(`${API_BASE}/api/auth/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Failed (${res.status})`);
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || `Failed to load profile (${res.status})`);
+      }
       setMe(await res.json());
     } catch (e) {
       setErr(e.message);
@@ -52,7 +65,10 @@ export default function ProfilePage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) setCards(await res.json());
-    } catch {}
+      else setCards([]);
+    } catch {
+      setCards([]);
+    }
   }
 
   useEffect(() => {
@@ -62,9 +78,11 @@ export default function ProfilePage() {
     }
   }, [token]);
 
+  /* ------------------------- validators & handlers ------------------------- */
   function validateCardInput() {
     const n = cardNumber.replace(/\s|-/g, "");
-    if (!/^\d{12,19}$/.test(n)) return "Enter a valid card number (12–19 digits for demo).";
+    if (!cardHolderName.trim()) return "Please enter the cardholder name.";
+    if (!/^\d{12,19}$/.test(n)) return "Enter a valid card number (12–19 digits).";
     const m = Number(expMonth);
     const y = Number(expYear);
     if (!(m >= 1 && m <= 12)) return "Month must be 1–12.";
@@ -91,7 +109,7 @@ export default function ProfilePage() {
         },
         body: JSON.stringify({
           cardNumber: n,
-          cardHolderName: `${me?.firstName ?? ""} ${me?.lastName ?? ""}`.trim() || "Cardholder",
+          cardHolderName: cardHolderName.trim(),
           expiryMonth: String(expMonth).padStart(2, "0"),
           expiryYear: String(expYear),
         }),
@@ -109,62 +127,106 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleDeleteCard(id) {
+    if (!window.confirm("Remove this card?")) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`${API_BASE}/api/payment-cards/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to remove card");
+      await loadCards();
+    } catch (e) {
+      setCardMsg({ type: "error", text: e.message });
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  /* ------------------------- render ------------------------- */
   if (!token) {
     return (
-      <div style={wrap}>
-        <h2>Profile</h2>
+      <div className={styles.container}>
+        <h2 className={styles.title}>Profile</h2>
         <p>Please log in to view your profile.</p>
       </div>
     );
   }
 
   return (
-    <div style={wrap}>
-      <h2>Profile</h2>
+    <div className={styles.container}>
+      <h2 className={styles.title}>Profile</h2>
 
       {loadingMe ? (
         <p>Loading...</p>
       ) : err ? (
-        <p style={errorStyle}>{err}</p>
+        <p className={styles.msgError}>{err}</p>
       ) : me ? (
         <>
-          <section style={card}>
-            <h3>Account</h3>
-            <div style={row}>
+          {/* Account summary */}
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Account</h3>
+            <div className={styles.row}>
               <strong>Name:</strong>{" "}
               <span>
                 {me.firstName || "(no first name)"} {me.lastName || ""}
               </span>
             </div>
-            <div style={row}>
+            <div className={styles.row}>
               <strong>Email:</strong> <span>{me.email}</span>
             </div>
-            <div style={row}>
+            <div className={styles.row}>
               <strong>Status:</strong> <span>{me.status}</span>
             </div>
           </section>
 
-          <section style={card}>
-            <h3>Payment Method</h3>
+          {/* Payment methods */}
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Payment Method</h3>
 
             {cards.length > 0 ? (
-              <div style={{ marginBottom: 12 }}>
+              <div className={styles.list}>
                 {cards.map((c) => (
-                  <div key={c.id} style={row}>
-                    <strong>Saved card:</strong>{" "}
-                    <span>
-                      {maskLast4(c.last4)} • {String(c.expiryMonth).padStart(2, "0")}/{c.expiryYear}
-                      {c.cardHolderName ? ` • ${c.cardHolderName}` : ""}
-                    </span>
+                  <div key={c.id} className={styles.cardRow}>
+                    <div className={styles.cardRowText}>
+                      <strong>Saved card:</strong>{" "}
+                      <span>
+                        {maskLast4(c.last4)} • {String(c.expiryMonth).padStart(2, "0")}/{c.expiryYear}
+                        {c.cardHolderName ? ` • ${c.cardHolderName}` : ""}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.dangerButton}
+                      onClick={() => handleDeleteCard(c.id)}
+                      disabled={deletingId === c.id}
+                      title="Remove card"
+                    >
+                      {deletingId === c.id ? "Removing..." : "Delete"}
+                    </button>
                   </div>
                 ))}
               </div>
             ) : (
-              <p style={{ marginBottom: 12 }}>No card on file.</p>
+              <p className={styles.subtle}>No card on file.</p>
             )}
 
-            <form onSubmit={handleSaveCard} style={{ display: "grid", gap: 8, maxWidth: 380 }}>
-              <label style={label}>
+            <form onSubmit={handleSaveCard} className={styles.form}>
+              <label className={styles.label}>
+                Cardholder name
+                <input
+                  type="text"
+                  placeholder="Name on card"
+                  value={cardHolderName}
+                  onChange={(e) => setCardHolderName(e.target.value)}
+                  className={styles.input}
+                  required
+                />
+              </label>
+
+              <label className={styles.label}>
                 Card number
                 <input
                   type="text"
@@ -172,14 +234,16 @@ export default function ProfilePage() {
                   autoComplete="cc-number"
                   placeholder="4242 4242 4242 4242"
                   value={cardNumber}
-                  onChange={(e) => setCardNumber(e.target.value)}
-                  style={input}
+                  onChange={(e) =>
+                    setCardNumber(e.target.value.replace(/[^\d\s-]/g, ""))
+                  }
+                  className={styles.input}
                   required
                 />
               </label>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <label style={label}>
+              <div className={styles.grid2}>
+                <label className={styles.label}>
                   Exp. month
                   <input
                     type="number"
@@ -188,12 +252,12 @@ export default function ProfilePage() {
                     placeholder="MM"
                     value={expMonth}
                     onChange={(e) => setExpMonth(e.target.value)}
-                    style={input}
+                    className={styles.input}
                     required
                   />
                 </label>
 
-                <label style={label}>
+                <label className={styles.label}>
                   Exp. year
                   <input
                     type="number"
@@ -202,18 +266,20 @@ export default function ProfilePage() {
                     placeholder="YYYY"
                     value={expYear}
                     onChange={(e) => setExpYear(e.target.value)}
-                    style={input}
+                    className={styles.input}
                     required
                   />
                 </label>
               </div>
 
-              <button type="submit" disabled={savingCard} style={button}>
+              <button type="submit" disabled={savingCard} className={styles.button}>
                 {savingCard ? "Saving..." : "Save Card"}
               </button>
 
               {cardMsg && (
-                <div style={cardMsg.type === "error" ? errorStyle : successStyle}>{cardMsg.text}</div>
+                <div className={cardMsg.type === "error" ? styles.msgError : styles.msgSuccess}>
+                  {cardMsg.text}
+                </div>
               )}
             </form>
           </section>
@@ -222,13 +288,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-/* ——— Styles ——— */
-const wrap = { maxWidth: 900, margin: "24px auto", padding: "0 16px", color: "#eee" };
-const card = { background: "#1a1a1a", padding: 16, borderRadius: 12, marginBottom: 16, boxShadow: "0 2px 10px rgba(0,0,0,.3)" };
-const row = { margin: "6px 0" };
-const label = { display: "grid", gap: 6, fontSize: 14 };
-const input = { padding: 10, borderRadius: 8, border: "1px solid #333", background: "#111", color: "#eee" };
-const button = { marginTop: 6, padding: "10px 14px", borderRadius: 8, border: "none", background: "#b3170f", color: "white", cursor: "pointer" };
-const errorStyle = { color: "#ff6b6b" };
-const successStyle = { color: "#34d399" };
