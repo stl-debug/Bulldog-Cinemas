@@ -209,7 +209,7 @@ async function auth(req, res, next) {
     const token = h.split(" ")[1];
     const payload = jwt.verify(token, process.env.JWT_SECRET); // has iat
 
-    const user = await User.findById(payload.id).select("_id email role status firstName lastName passwordChangedAt addresses paymentCards");
+    const user = await User.findById(payload.id).select("_id email role status firstName lastName passwordChangedAt promotions addresses paymentCards");
     if (!user) return res.status(401).json({ error: "Unauthorized" });
     if (user.passwordChangedAt) {
       const issued = payload.iat * 1000;
@@ -235,6 +235,7 @@ app.get("/api/auth/profile", auth, async (_req, res) => {
     email: u.email,
     status: u.status,
     role: u.role,
+    promotions: u.promotions,
     addresses: u.addresses || [],
   });
 });

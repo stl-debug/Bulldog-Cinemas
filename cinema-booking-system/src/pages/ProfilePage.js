@@ -43,6 +43,16 @@ export default function ProfilePage() {
   const [savingAddress, setSavingAddress] = useState(false);
   const [addressMsg, setAddressMsg] = useState(null);
 
+  // profile edit
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    firstName: '',
+    lastName: '',
+    promotions: false
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileMsg, setProfileMsg] = useState(null);
+
   // auth token
   const token = useMemo(() => {
     try {
@@ -69,10 +79,16 @@ export default function ProfilePage() {
        }
       const data = await res.json();
       setMe(data);
-       // Initialize address form if address exists
-       if (data.addresses && data.addresses.length > 0) {
-         setAddressForm(data.addresses[0]);
-       }
+      // Initialize profile form
+      setProfileForm({
+        firstName: data.firstName || '',
+        lastName: data.lastName || '',
+        promotions: data.promotions || false
+      });
+      // Initialize address form if address exists
+      if (data.addresses && data.addresses.length > 0) {
+        setAddressForm(data.addresses[0]);
+      }
      } catch (e) {
        setErr(e.message);
      } finally {
@@ -223,6 +239,54 @@ export default function ProfilePage() {
     }));
   }
 
+  async function handleSaveProfile(e) {
+    e.preventDefault();
+    setProfileMsg(null);
+    
+    if (!me?.id) {
+      setProfileMsg({ type: "error", text: "User ID not found" });
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          firstName: profileForm.firstName,
+          lastName: profileForm.lastName,
+          promotions: profileForm.promotions
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to save profile");
+      }
+
+      setProfileMsg({ type: "success", text: "Profile updated successfully" });
+      setEditingProfile(false);
+      await loadMe();
+    } catch (e) {
+      setProfileMsg({ type: "error", text: e.message });
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  function handleProfileChange(e) {
+    const { name, value, type, checked } = e.target;
+    setProfileForm(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  }
+
   /* ------------------------- render ------------------------- */
   if (!token) {
     return (
@@ -249,18 +313,117 @@ export default function ProfilePage() {
           {/* Account summary */}
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>Account</h3>
-            <div className={styles.row}>
-              <strong>Name:</strong>{" "}
-              <span>
-                {me.firstName || "(no first name)"} {me.lastName || ""}
-              </span>
-            </div>
-            <div className={styles.row}>
-              <strong>Email:</strong> <span>{me.email}</span>
-            </div>
-            <div className={styles.row}>
-              <strong>Status:</strong> <span>{me.status}</span>
-            </div>
+            {!editingProfile ? (
+              <>
+                <div className={styles.row}>
+                  <strong>Name:</strong>{" "}
+                  <span>
+                    {me.firstName || "(no first name)"} {me.lastName || ""}
+                  </span>
+                </div>
+                <div className={styles.row}>
+                  <strong>Email:</strong> <span>{me.email}</span>
+                </div>
+                <div className={styles.row}>
+                  <strong>Status:</strong> <span>{me.status}</span>
+                </div>
+                <div className={styles.row}>
+                  <strong>Promotions:</strong> <span>{me.promotions ? 'Yes' : 'No'}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingProfile(true)}
+                  className={styles.button}
+                  style={{ marginTop: '12px' }}
+                >
+                  Edit Profile
+                </button>
+                {profileMsg && (
+                  <div className={profileMsg.type === "error" ? styles.msgError : styles.msgSuccess}>
+                    {profileMsg.text}
+                  </div>
+                )}
+              </>
+            ) : (
+              <form onSubmit={handleSaveProfile} className={styles.form}>
+                <label className={styles.label}>
+                  First Name
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={profileForm.firstName}
+                    onChange={handleProfileChange}
+                    className={styles.input}
+                    placeholder="First name"
+                  />
+                </label>
+
+                <label className={styles.label}>
+                  Last Name
+                  <input
+                    type="text"
+                    name="lastName"
+                    value={profileForm.lastName}
+                    onChange={handleProfileChange}
+                    className={styles.input}
+                    placeholder="Last name"
+                  />
+                </label>
+
+                <label className={styles.label}>
+                  Email (read-only)
+                  <input
+                    type="email"
+                    value={me.email}
+                    disabled
+                    className={styles.input}
+                    style={{ backgroundColor: '#f5f5f5' }}
+                  />
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    name="promotions"
+                    checked={profileForm.promotions}
+                    onChange={handleProfileChange}
+                  />
+                  <span>Receive promotional emails</span>
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className={styles.button}
+                >
+                  {savingProfile ? "Saving..." : "Save Changes"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingProfile(false);
+                    setProfileMsg(null);
+                    // Reset form to original data
+                    setProfileForm({
+                      firstName: me.firstName || '',
+                      lastName: me.lastName || '',
+                      promotions: me.promotions || false
+                    });
+                  }}
+                  className={styles.button}
+                  style={{ backgroundColor: 'gray', marginLeft: '8px' }}
+                >
+                  Cancel
+                </button>
+
+                {profileMsg && (
+                  <div className={profileMsg.type === "error" ? styles.msgError : styles.msgSuccess}>
+                    {profileMsg.text}
+                  </div>
+                )}
+              </form>
+            )}
           </section>
 
           {/* Address */}
