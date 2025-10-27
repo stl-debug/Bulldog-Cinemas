@@ -22,13 +22,26 @@ export default function ProfilePage() {
   const [cards, setCards] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
 
-  // form
+  // card form
   const [cardHolderName, setCardHolderName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [expMonth, setExpMonth] = useState("");
   const [expYear, setExpYear] = useState("");
   const [savingCard, setSavingCard] = useState(false);
   const [cardMsg, setCardMsg] = useState(null);
+
+  // address form
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [addressForm, setAddressForm] = useState({
+    line1: '',
+    line2: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: 'USA'
+  });
+  const [savingAddress, setSavingAddress] = useState(false);
+  const [addressMsg, setAddressMsg] = useState(null);
 
   // auth token
   const token = useMemo(() => {
@@ -39,43 +52,56 @@ export default function ProfilePage() {
     }
   }, []);
 
-  /* ------------------------- data loaders ------------------------- */
-  async function loadMe() {
-    setLoadingMe(true);
-    setErr(null);
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.error || `Failed to load profile (${res.status})`);
-      }
-      setMe(await res.json());
-    } catch (e) {
-      setErr(e.message);
-    } finally {
-      setLoadingMe(false);
-    }
-  }
+   /* ------------------------- data loaders ------------------------- */
+   async function loadMe() {
+     setLoadingMe(true);
+     setErr(null);
+     try {
+       if (!token) {
+         throw new Error('No authentication token found');
+       }
+       const res = await fetch(`${API_BASE}/api/auth/profile`, {
+         headers: { Authorization: `Bearer ${token}` },
+       });
+       if (!res.ok) {
+         const d = await res.json().catch(() => ({}));
+         throw new Error(d.error || `Failed to load profile (${res.status})`);
+       }
+      const data = await res.json();
+      setMe(data);
+       // Initialize address form if address exists
+       if (data.addresses && data.addresses.length > 0) {
+         setAddressForm(data.addresses[0]);
+       }
+     } catch (e) {
+       setErr(e.message);
+     } finally {
+       setLoadingMe(false);
+     }
+   }
 
-  async function loadCards() {
-    try {
-      const res = await fetch(`${API_BASE}/api/payment-cards`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) setCards(await res.json());
-      else setCards([]);
-    } catch {
-      setCards([]);
-    }
-  }
+   async function loadCards() {
+     if (!token) {
+       setCards([]);
+       return;
+     }
+     try {
+       const res = await fetch(`${API_BASE}/api/payment-cards`, {
+         headers: { Authorization: `Bearer ${token}` },
+       });
+       if (res.ok) setCards(await res.json());
+       else setCards([]);
+     } catch {
+       setCards([]);
+     }
+   }
 
   useEffect(() => {
     if (token) {
       loadMe();
       loadCards();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   /* ------------------------- validators & handlers ------------------------- */
@@ -94,6 +120,12 @@ export default function ProfilePage() {
   async function handleSaveCard(e) {
     e.preventDefault();
     setCardMsg(null);
+    
+    // Check if user already has 4 cards
+    if (cards.length >= 4) {
+      return setCardMsg({ type: "error", text: "Maximum of 4 credit cards allowed. Please delete one before adding another." });
+    }
+    
     const v = validateCardInput();
     if (v) return setCardMsg({ type: "error", text: v });
 
@@ -145,12 +177,61 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleSaveAddress(e) {
+    e.preventDefault();
+    setAddressMsg(null);
+    
+    if (!me?.id) {
+      setAddressMsg({ type: "error", text: "User ID not found" });
+      return;
+    }
+
+    setSavingAddress(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          address: addressForm
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to save address");
+      }
+
+      setAddressMsg({ type: "success", text: "Address saved successfully" });
+      setEditingAddress(false);
+      await loadMe();
+    } catch (e) {
+      setAddressMsg({ type: "error", text: e.message });
+    } finally {
+      setSavingAddress(false);
+    }
+  }
+
+  function handleAddressChange(e) {
+    const { name, value } = e.target;
+    setAddressForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  }
+
   /* ------------------------- render ------------------------- */
   if (!token) {
     return (
       <div className={styles.container}>
         <h2 className={styles.title}>Profile</h2>
-        <p>Please log in to view your profile.</p>
+        <p className={styles.msgError}>Please log in to view your profile.</p>
+        <a href="/login" className={styles.button} style={{ display: 'inline-block', textDecoration: 'none', marginTop: '12px' }}>
+          Go to Login
+        </a>
       </div>
     );
   }
@@ -180,6 +261,149 @@ export default function ProfilePage() {
             <div className={styles.row}>
               <strong>Status:</strong> <span>{me.status}</span>
             </div>
+          </section>
+
+          {/* Address */}
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Address</h3>
+            {!editingAddress ? (
+              <>
+                {me.addresses && me.addresses.length > 0 ? (
+                  <div style={{ marginBottom: '12px' }}>
+                    {me.addresses[0].line1 && <div className={styles.row}>{me.addresses[0].line1}</div>}
+                    {me.addresses[0].line2 && <div className={styles.row}>{me.addresses[0].line2}</div>}
+                    {(me.addresses[0].city || me.addresses[0].state || me.addresses[0].zip) && (
+                      <div className={styles.row}>
+                        {me.addresses[0].city}{me.addresses[0].city && me.addresses[0].state ? ', ' : ''}{me.addresses[0].state} {me.addresses[0].zip}
+                      </div>
+                    )}
+                    {me.addresses[0].country && <div className={styles.row}>{me.addresses[0].country}</div>}
+                  </div>
+                ) : (
+                  <p className={styles.subtle}>No address on file.</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setEditingAddress(true)}
+                  className={styles.button}
+                  style={{ marginTop: '12px' }}
+                >
+                  {me.addresses && me.addresses.length > 0 ? "Edit Address" : "Add Address"}
+                </button>
+              </>
+            ) : (
+              <form onSubmit={handleSaveAddress} className={styles.form}>
+                <label className={styles.label}>
+                  Address Line 1
+                  <input
+                    type="text"
+                    name="line1"
+                    value={addressForm.line1}
+                    onChange={handleAddressChange}
+                    className={styles.input}
+                    placeholder="123 Main St"
+                  />
+                </label>
+
+                <label className={styles.label}>
+                  Address Line 2
+                  <input
+                    type="text"
+                    name="line2"
+                    value={addressForm.line2}
+                    onChange={handleAddressChange}
+                    className={styles.input}
+                    placeholder="Apt 4B"
+                  />
+                </label>
+
+                <div className={styles.grid2}>
+                  <label className={styles.label}>
+                    City
+                    <input
+                      type="text"
+                      name="city"
+                      value={addressForm.city}
+                      onChange={handleAddressChange}
+                      className={styles.input}
+                      placeholder="City"
+                    />
+                  </label>
+
+                  <label className={styles.label}>
+                    State
+                    <input
+                      type="text"
+                      name="state"
+                      value={addressForm.state}
+                      onChange={handleAddressChange}
+                      className={styles.input}
+                      placeholder="State"
+                    />
+                  </label>
+                </div>
+
+                <div className={styles.grid2}>
+                  <label className={styles.label}>
+                    ZIP Code
+                    <input
+                      type="text"
+                      name="zip"
+                      value={addressForm.zip}
+                      onChange={handleAddressChange}
+                      className={styles.input}
+                      placeholder="12345"
+                    />
+                  </label>
+
+                  <label className={styles.label}>
+                    Country
+                    <input
+                      type="text"
+                      name="country"
+                      value={addressForm.country}
+                      onChange={handleAddressChange}
+                      className={styles.input}
+                      placeholder="USA"
+                    />
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={savingAddress}
+                  className={styles.button}
+                >
+                  {savingAddress ? "Saving..." : "Save Address"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingAddress(false);
+                    setAddressMsg(null);
+                    // Reset form to original data
+                    if (me.addresses && me.addresses.length > 0) {
+                      setAddressForm(me.addresses[0]);
+                    } else {
+                      setAddressForm({
+                        line1: '', line2: '', city: '', state: '', zip: '', country: 'USA'
+                      });
+                    }
+                  }}
+                  className={styles.button}
+                  style={{ backgroundColor: 'gray', marginLeft: '8px' }}
+                >
+                  Cancel
+                </button>
+
+                {addressMsg && (
+                  <div className={addressMsg.type === "error" ? styles.msgError : styles.msgSuccess}>
+                    {addressMsg.text}
+                  </div>
+                )}
+              </form>
+            )}
           </section>
 
           {/* Payment methods */}
@@ -272,8 +496,8 @@ export default function ProfilePage() {
                 </label>
               </div>
 
-              <button type="submit" disabled={savingCard} className={styles.button}>
-                {savingCard ? "Saving..." : "Save Card"}
+              <button type="submit" disabled={savingCard || cards.length >= 4} className={styles.button}>
+                {cards.length >= 4 ? "Maximum 4 cards reached" : savingCard ? "Saving..." : "Save Card"}
               </button>
 
               {cardMsg && (

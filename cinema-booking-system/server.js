@@ -209,7 +209,7 @@ async function auth(req, res, next) {
     const token = h.split(" ")[1];
     const payload = jwt.verify(token, process.env.JWT_SECRET); // has iat
 
-    const user = await User.findById(payload.id).select("_id email role status firstName lastName passwordChangedAt");
+    const user = await User.findById(payload.id).select("_id email role status firstName lastName passwordChangedAt addresses paymentCards");
     if (!user) return res.status(401).json({ error: "Unauthorized" });
     if (user.passwordChangedAt) {
       const issued = payload.iat * 1000;
@@ -235,12 +235,13 @@ app.get("/api/auth/profile", auth, async (_req, res) => {
     email: u.email,
     status: u.status,
     role: u.role,
+    addresses: u.addresses || [],
   });
 });
 
 app.put("/api/auth/profile", auth, async (req, res) => {
   try {
-    const { firstName, lastName, password, promotions } = req.body;
+    const { firstName, lastName, password, promotions, address } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: "User not found" });
     if (firstName !== undefined) user.firstName = firstName;
@@ -249,6 +250,10 @@ app.put("/api/auth/profile", auth, async (req, res) => {
     if (password) {
       user.passwordHash = await bcrypt.hash(password, 10);
       user.passwordChangedAt = new Date();
+    }
+    // Handle address - only allow one address per user
+    if (address !== undefined) {
+      user.addresses = [address]; // Replace any existing addresses with the new one
     }
     await user.save();
     res.json({ message: "Profile updated" });
