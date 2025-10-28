@@ -16,7 +16,7 @@ function generateToken() {
   return crypto.randomBytes(32).toString("hex");
 }
 
-/* ------------------------- REGISTER ------------------------- */
+// register email 
 router.post('/register', async (req, res) => {
     try {
         const { email, password, firstName, lastName, promotions } = req.body;
@@ -64,7 +64,7 @@ router.post('/register', async (req, res) => {
     }
 });
 
-/* ------------------------- CONFIRM EMAIL ------------------------- */
+// confirm email
 router.get('/confirm-email/:token', async (req, res) => {
     try {
         const user = await User.findOne({ emailConfirmToken: req.params.token });
@@ -81,27 +81,22 @@ router.get('/confirm-email/:token', async (req, res) => {
     }
 });
 
-/* ------------------------- LOGIN ------------------------- */
+// login user 
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // 1️⃣ Find user
         const user = await User.findOne({ email });
         if (!user) return res.status(401).json({ error: 'Invalid email or password' });
 
-        // 2️⃣ Require confirmed email
         if (user.status !== 'Active')
             return res.status(403).json({ error: 'Please confirm your email first' });
         
-        // 3️⃣ Check password
         const ok = await bcrypt.compare(password, user.passwordHash);
         if (!ok) return res.status(401).json({ error: 'Invalid email or password' });
 
-        // 4️⃣ Generate token
         const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
 
-        // 5️⃣ Return token + user data
         res.status(200).json({
             token,
             user: {
@@ -118,13 +113,12 @@ router.post('/login', async (req, res) => {
     }
 });
 
-/* ------------------------- LOGOUT ------------------------- */
+// logout user
 router.post('/logout', (req, res) => {
-    // frontend should delete token or clear cookie
     res.json({ message: 'Logged out' });
 });
 
-/* ------------------------- FORGOT PASSWORD ------------------------- */
+// forgot password
 router.post('/forgot-password', async (req, res) => {
     try {
         const { email } = req.body;
@@ -135,7 +129,7 @@ router.post('/forgot-password', async (req, res) => {
 
         const token = generateToken();
         user.resetPasswordToken = token;
-        user.resetPasswordExpires = Date.now() + 1000 * 60 * 60; // 1 hour
+        user.resetPasswordExpires = Date.now() + 1000 * 60 * 60; 
 
         await user.save();
 
@@ -153,7 +147,7 @@ router.post('/forgot-password', async (req, res) => {
     }
 });
 
-/* ------------------------- RESET PASSWORD ------------------------- */
+// reset password
 router.post('/reset-password', async (req, res) => {
     try {
         const { token, newPassword } = req.body;

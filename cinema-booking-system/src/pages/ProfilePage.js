@@ -1,4 +1,3 @@
-// src/pages/ProfilePage.js
 import React, { useEffect, useMemo, useState } from "react";
 import styles from "../styles/ProfilePage.module.css";
 
@@ -73,7 +72,7 @@ export default function ProfilePage() {
     }
   }, []);
 
-   /* ------------------------- data loaders ------------------------- */
+   // data loaders
    async function loadMe() {
      setLoadingMe(true);
      setErr(null);
@@ -90,13 +89,11 @@ export default function ProfilePage() {
        }
       const data = await res.json();
       setMe(data);
-      // Initialize profile form
       setProfileForm({
         firstName: data.firstName || '',
         lastName: data.lastName || '',
         promotions: data.promotions || false
       });
-      // Initialize address form if address exists
       if (data.addresses && data.addresses.length > 0) {
         setAddressForm(data.addresses[0]);
       }
@@ -128,13 +125,11 @@ export default function ProfilePage() {
       loadMe();
       loadCards();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  /* ------------------------- validators & handlers ------------------------- */
+  // validators & handlers
   function validateCardInput() {
     if (!cardHolderName.trim()) return "Please enter the cardholder name.";
-    // Only validate card number when adding new card (not editing)
     if (!editingCardId) {
       const n = cardNumber.replace(/\s|-/g, "");
       if (!/^\d{12,19}$/.test(n)) return "Enter a valid card number (12–19 digits).";
@@ -186,12 +181,10 @@ export default function ProfilePage() {
     e.preventDefault();
     setCardMsg(null);
     
-    // Check if user already has 4 cards (only when adding new, not editing)
     if (!editingCardId && cards.length >= 4) {
       return setCardMsg({ type: "error", text: "Maximum of 4 credit cards allowed. Please delete one before adding another." });
     }
     
-    // If editing, only update non-sensitive fields
     if (editingCardId) {
       const v = validateCardInput();
       if (v) return setCardMsg({ type: "error", text: v });
@@ -224,7 +217,6 @@ export default function ProfilePage() {
       return;
     }
 
-    // Original logic for adding new card
     const v = validateCardInput();
     if (v) return setCardMsg({ type: "error", text: v });
 
@@ -415,7 +407,7 @@ export default function ProfilePage() {
     }));
   }
 
-  /* ------------------------- render ------------------------- */
+  // render
   if (!token) {
     return (
       <div className={styles.container}>
