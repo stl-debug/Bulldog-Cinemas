@@ -21,6 +21,7 @@ export default function ProfilePage() {
   // cards
   const [cards, setCards] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
+  const [editingCardId, setEditingCardId] = useState(null);
 
   // card form
   const [cardHolderName, setCardHolderName] = useState("");
@@ -132,9 +133,12 @@ export default function ProfilePage() {
 
   /* ------------------------- validators & handlers ------------------------- */
   function validateCardInput() {
-    const n = cardNumber.replace(/\s|-/g, "");
     if (!cardHolderName.trim()) return "Please enter the cardholder name.";
-    if (!/^\d{12,19}$/.test(n)) return "Enter a valid card number (12–19 digits).";
+    // Only validate card number when adding new card (not editing)
+    if (!editingCardId) {
+      const n = cardNumber.replace(/\s|-/g, "");
+      if (!/^\d{12,19}$/.test(n)) return "Enter a valid card number (12–19 digits).";
+    }
     const m = Number(expMonth);
     const y = Number(expYear);
     if (!(m >= 1 && m <= 12)) return "Month must be 1–12.";
@@ -143,15 +147,84 @@ export default function ProfilePage() {
     return null;
   }
 
+  async function handleDeleteCard(id) {
+    if (!window.confirm("Remove this card?")) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`${API_BASE}/api/payment-cards/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to remove card");
+      await loadCards();
+    } catch (e) {
+      setCardMsg({ type: "error", text: e.message });
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function handleStartEditCard(card) {
+    setEditingCardId(card.id);
+    setCardHolderName(card.cardHolderName || "");
+    setExpMonth(String(card.expiryMonth || ""));
+    setExpYear(String(card.expiryYear || ""));
+    setCardNumber(""); // Don't show the card number when editing
+  }
+
+  function handleCancelEditCard() {
+    setEditingCardId(null);
+    setCardHolderName("");
+    setExpMonth("");
+    setExpYear("");
+    setCardNumber("");
+    setCardMsg(null);
+  }
+
   async function handleSaveCard(e) {
     e.preventDefault();
     setCardMsg(null);
     
-    // Check if user already has 4 cards
-    if (cards.length >= 4) {
+    // Check if user already has 4 cards (only when adding new, not editing)
+    if (!editingCardId && cards.length >= 4) {
       return setCardMsg({ type: "error", text: "Maximum of 4 credit cards allowed. Please delete one before adding another." });
     }
     
+    // If editing, only update non-sensitive fields
+    if (editingCardId) {
+      const v = validateCardInput();
+      if (v) return setCardMsg({ type: "error", text: v });
+
+      setSavingCard(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/payment-cards/${editingCardId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            cardHolderName: cardHolderName.trim(),
+            expiryMonth: String(expMonth).padStart(2, "0"),
+            expiryYear: String(expYear),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Failed to update card");
+
+        setCardMsg({ type: "success", text: "Payment method updated." });
+        handleCancelEditCard();
+        await loadCards();
+      } catch (e) {
+        setCardMsg({ type: "error", text: e.message });
+      } finally {
+        setSavingCard(false);
+      }
+      return;
+    }
+
+    // Original logic for adding new card
     const v = validateCardInput();
     if (v) return setCardMsg({ type: "error", text: v });
 
@@ -177,29 +250,14 @@ export default function ProfilePage() {
 
       setCardMsg({ type: "success", text: "Payment method saved." });
       setCardNumber("");
+      setCardHolderName("");
+      setExpMonth("");
+      setExpYear("");
       await loadCards();
     } catch (e) {
       setCardMsg({ type: "error", text: e.message });
     } finally {
       setSavingCard(false);
-    }
-  }
-
-  async function handleDeleteCard(id) {
-    if (!window.confirm("Remove this card?")) return;
-    setDeletingId(id);
-    try {
-      const res = await fetch(`${API_BASE}/api/payment-cards/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Failed to remove card");
-      await loadCards();
-    } catch (e) {
-      setCardMsg({ type: "error", text: e.message });
-    } finally {
-      setDeletingId(null);
     }
   }
 
@@ -735,15 +793,26 @@ export default function ProfilePage() {
                         {c.cardHolderName ? ` • ${c.cardHolderName}` : ""}
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      className={styles.dangerButton}
-                      onClick={() => handleDeleteCard(c.id)}
-                      disabled={deletingId === c.id}
-                      title="Remove card"
-                    >
-                      {deletingId === c.id ? "Removing..." : "Delete"}
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        className={styles.button}
+                        onClick={() => handleStartEditCard(c)}
+                        title="Edit card"
+                        style={{ backgroundColor: '#555' }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.dangerButton}
+                        onClick={() => handleDeleteCard(c.id)}
+                        disabled={deletingId === c.id}
+                        title="Remove card"
+                      >
+                        {deletingId === c.id ? "Removing..." : "Delete"}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -764,21 +833,23 @@ export default function ProfilePage() {
                 />
               </label>
 
-              <label className={styles.label}>
-                Card number
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="cc-number"
-                  placeholder="4242 4242 4242 4242"
-                  value={cardNumber}
-                  onChange={(e) =>
-                    setCardNumber(e.target.value.replace(/[^\d\s-]/g, ""))
-                  }
-                  className={styles.input}
-                  required
-                />
-              </label>
+              {!editingCardId && (
+                <label className={styles.label}>
+                  Card number
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="cc-number"
+                    placeholder="4242 4242 4242 4242"
+                    value={cardNumber}
+                    onChange={(e) =>
+                      setCardNumber(e.target.value.replace(/[^\d\s-]/g, ""))
+                    }
+                    className={styles.input}
+                    required
+                  />
+                </label>
+              )}
 
               <div className={styles.grid2}>
                 <label className={styles.label}>
@@ -810,9 +881,20 @@ export default function ProfilePage() {
                 </label>
               </div>
 
-              <button type="submit" disabled={savingCard || cards.length >= 4} className={styles.button}>
-                {cards.length >= 4 ? "Maximum 4 cards reached" : savingCard ? "Saving..." : "Save Card"}
+              <button type="submit" disabled={savingCard || (!editingCardId && cards.length >= 4)} className={styles.button}>
+                {!editingCardId && cards.length >= 4 ? "Maximum 4 cards reached" : savingCard ? (editingCardId ? "Updating..." : "Saving...") : (editingCardId ? "Update Card" : "Save Card")}
               </button>
+
+              {editingCardId && (
+                <button
+                  type="button"
+                  onClick={handleCancelEditCard}
+                  className={styles.button}
+                  style={{ backgroundColor: 'gray', marginLeft: '8px' }}
+                >
+                  Cancel
+                </button>
+              )}
 
               {cardMsg && (
                 <div className={cardMsg.type === "error" ? styles.msgError : styles.msgSuccess}>
