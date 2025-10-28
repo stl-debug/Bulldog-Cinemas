@@ -1,4 +1,3 @@
-// src/middleware/auth.js (or wherever you keep it)
 const express = require("express");
 const router = express.Router();
 const bcrypt = require('bcrypt');
