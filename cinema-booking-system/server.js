@@ -9,11 +9,11 @@ require("dotenv").config();
 
 const Movie = require("./src/models/Movie");
 const User = require("./src/models/User");
-const { encryptText } = require("./src/utils/crypto"); // used to encrypt PANs
+const { encryptText } = require("./src/utils/crypto"); 
 
 const app = express();
 
-/* ------------------- Middleware ------------------- */
+// Middleware
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
@@ -23,7 +23,7 @@ app.use(
 );
 app.use(express.json());
 
-/* ------------------- Email Helpers ------------------- */
+// Email Helpers
 function makeTransport() {
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -85,13 +85,13 @@ async function sendProfileUpdateEmail(userEmail, changes) {
 }
 
 
-/* ------------------- DB ------------------- */
+// DB 
 mongoose
   .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-/* ------------------- Movies ------------------- */
+// Movies
 app.get("/api/movies", async (_req, res) => {
   try {
     const movies = await Movie.find({}).lean();
@@ -121,7 +121,7 @@ app.post("/api/movies", async (req, res) => {
   }
 });
 
-/* ------------------- Auth ------------------- */
+// Auth
 // Register
 app.post("/api/auth/register", async (req, res) => {
   try {
@@ -269,13 +269,13 @@ app.post("/api/auth/reset-password", async (req, res) => {
   }
 });
 
-/* ------------------- Inline auth middleware (uses JWT) ------------------- */
+// Inline auth middleware (uses JWT) 
 async function auth(req, res, next) {
   try {
     const h = req.headers.authorization || "";
     if (!h.startsWith("Bearer ")) return res.status(401).json({ error: "Missing Authorization" });
     const token = h.split(" ")[1];
-    const payload = jwt.verify(token, process.env.JWT_SECRET); // has iat
+    const payload = jwt.verify(token, process.env.JWT_SECRET); 
 
     const user = await User.findById(payload.id).select("_id email role status firstName lastName passwordChangedAt promotions addresses paymentCards");
     if (!user) return res.status(401).json({ error: "Unauthorized" });
@@ -286,14 +286,14 @@ async function auth(req, res, next) {
       }
     }
     req.user = { id: String(user._id), email: user.email, role: user.role };
-    req.userDoc = user; // handy for profile GET
+    req.userDoc = user; 
     next();
   } catch {
     res.status(401).json({ error: "Unauthorized" });
   }
 }
 
-/* ------------------- Profile (protected) ------------------- */
+// Profile
 app.get("/api/auth/profile", auth, async (_req, res) => {
   const u = _req.userDoc;
   res.json({
@@ -359,7 +359,7 @@ app.put("/api/auth/profile", auth, async (req, res) => {
   }
 });
 
-/* ------------------- Payment cards (protected) ------------------- */
+//Payment cards (protected)
 // List masked cards
 app.get("/api/payment-cards", auth, async (req, res) => {
   const user = await User.findById(req.user.id).lean();
@@ -440,7 +440,7 @@ app.delete("/api/payment-cards/:id", auth, async (req, res) => {
     const card = (user.paymentCards || []).find((c) => String(c._id) === String(req.params.id));
     if (!card) return res.status(404).json({ error: "Card not found" });
 
-    const last4 = card.last4; // <-- declare it here
+    const last4 = card.last4;
 
     // Remove the card
     user.paymentCards = (user.paymentCards || []).filter((c) => String(c._id) !== String(req.params.id));
@@ -458,7 +458,7 @@ app.delete("/api/payment-cards/:id", auth, async (req, res) => {
 
 
 
-/* ------------------- Addresses (protected) ------------------- */
+//Addresses (protected) 
 app.get("/api/addresses", auth, async (req, res) => {
   const user = await User.findById(req.user.id).lean();
   if (!user) return res.status(404).json({ error: "User not found" });
@@ -520,10 +520,10 @@ app.delete("/api/addresses/:id", auth, async (req, res) => {
   res.json({ message: "Address removed" });
 });
 
-/* ------------------- Misc ------------------- */
+//Misc
 app.post("/api/auth/logout", (_req, res) => res.json({ message: "Logged out" }));
 app.get("/api/test", (_req, res) => res.send("API is working"));
 
-/* ------------------- Start ------------------- */
+//Start
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
