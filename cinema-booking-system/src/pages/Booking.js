@@ -33,6 +33,7 @@ function BookingPage() {
         }
     }, [user, navigate, movieId, time, date]);
 
+
     const handleSeatClick = (seatId) => {
         if (selectedSeats.includes(seatId)) {
             setSelectedSeats(selectedSeats.filter(seat => seat !== seatId));
@@ -97,6 +98,7 @@ function BookingPage() {
                         })
                     )}
                 </div>
+                
 
                 {selectedSeats.length > 0 && (
                     <>

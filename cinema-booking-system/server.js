@@ -59,6 +59,32 @@ async function sendPasswordResetEmail(userEmail, token) {
   });
 }
 
+async function sendProfileUpdateEmail(userEmail, changes) {
+  try {
+    const transporter = makeTransport();
+    const html = `
+      <h2>Your profile has been updated</h2>
+      <p>The following fields were changed:</p>
+      <ul>
+        ${changes.map(change => `<li>${change}</li>`).join('')}
+      </ul>
+      <p>If you did not make these changes, please contact support immediately.</p>
+    `;
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: userEmail,
+      subject: 'Profile Update Notification',
+      html,
+    });
+
+    console.log(`Profile update email sent to ${userEmail}`);
+  } catch (err) {
+    console.error("Error sending profile update email:", err);
+  }
+}
+
+
 /* ------------------- DB ------------------- */
 mongoose
   .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -132,11 +158,53 @@ app.get("/api/auth/confirm/:token", async (req, res) => {
     if (!user) return res.status(404).send("User not found");
     user.status = "Active";
     await user.save();
-    res.redirect(`${process.env.FRONTEND_URL}/confirmed`);
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Account Confirmation</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+              margin: 0;
+              background: linear-gradient(180deg, #111, #440000);
+            }
+            .container {
+              background: rgba(28, 28, 28, 0.95);
+              padding: 2rem 3rem;
+              border-radius: 10px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+              text-align: center;
+            }
+            h1 {
+              color: #ffd700;
+              margin: 0 0 1rem 0;
+            }
+            p {
+              color: #ddd;
+              margin: 0.5rem 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Account Confirmation Successful!</h1>
+            <p>You may close this window.</p>
+            <p>If already logged in, refresh your browser to see your updated status.</p>
+          </div>
+        </body>
+      </html>
+    `);
   } catch {
     res.status(400).send("Invalid or expired token");
   }
 });
+
+
 
 // Login
 app.post("/api/auth/login", async (req, res) => {
@@ -144,13 +212,13 @@ app.post("/api/auth/login", async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ error: "User not found" });
-    if (user.status !== "Active") return res.status(403).json({ error: "Please confirm your email" });
+    
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: "Incorrect password" });
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1d" });
-    res.json({ token, user: { id: user._id, email: user.email, role: user.role } });
+    res.json({ token, user: { id: user._id, email: user.email, role: user.role, status: user.status } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -240,33 +308,52 @@ app.get("/api/auth/profile", auth, async (_req, res) => {
   });
 });
 
+
 app.put("/api/auth/profile", auth, async (req, res) => {
   try {
     const { firstName, lastName, password, oldPassword, promotions, address } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: "User not found" });
-    if (firstName !== undefined) user.firstName = firstName;
-    if (lastName !== undefined) user.lastName = lastName;
-    if (typeof promotions === "boolean") user.promotions = promotions;
-    // Handle password change - require old password
+
+    let changes = [];
+
+    if (firstName !== undefined && firstName !== user.firstName) {
+      user.firstName = firstName;
+      changes.push("First name updated");
+    }
+    if (lastName !== undefined && lastName !== user.lastName) {
+      user.lastName = lastName;
+      changes.push("Last name updated");
+    }
+    if (typeof promotions === "boolean" && promotions !== user.promotions) {
+      user.promotions = promotions;
+      changes.push("Promotions preference updated");
+    }
+
+    // Handle password change
     if (password) {
-      if (!oldPassword) {
-        return res.status(400).json({ error: "Old password is required to change password" });
-      }
-      // Verify old password
+      if (!oldPassword) return res.status(400).json({ error: "Old password is required to change password" });
       const valid = await bcrypt.compare(oldPassword, user.passwordHash);
-      if (!valid) {
-        return res.status(401).json({ error: "Incorrect old password" });
-      }
+      if (!valid) return res.status(401).json({ error: "Incorrect old password" });
       user.passwordHash = await bcrypt.hash(password, 10);
       user.passwordChangedAt = new Date();
+      changes.push("Password updated");
     }
-    // Handle address - only allow one address per user
+
+    // Handle address update
     if (address !== undefined) {
-      user.addresses = [address]; // Replace any existing addresses with the new one
+      user.addresses = [address]; // Replace existing addresses
+      changes.push("Address updated");
     }
+
     await user.save();
-    res.json({ message: "Profile updated" });
+
+    // Send notification if any changes
+    if (changes.length > 0) {
+      await sendProfileUpdateEmail(user.email, changes);
+    }
+
+    res.json({ message: "Profile updated", changes });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -315,6 +402,13 @@ app.put("/api/payment-cards", auth, async (req, res) => {
   });
 
   await user.save();
+
+  try {
+    await sendProfileUpdateEmail(user.email, [`New card ending in ${last4} added`]);
+  } catch (err) {
+    console.error("Error sending card add email:", err);
+  }
+
   res.json({ message: "Card added" });
 });
 
@@ -338,16 +432,31 @@ app.patch("/api/payment-cards/:id", auth, async (req, res) => {
 
 // Delete card
 app.delete("/api/payment-cards/:id", auth, async (req, res) => {
-  const user = await User.findById(req.user.id);
-  if (!user) return res.status(404).json({ error: "User not found" });
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-  const before = (user.paymentCards || []).length;
-  user.paymentCards = (user.paymentCards || []).filter((c) => String(c._id) !== String(req.params.id));
-  if (user.paymentCards.length === before) return res.status(404).json({ error: "Card not found" });
+    // Find the card first
+    const card = (user.paymentCards || []).find((c) => String(c._id) === String(req.params.id));
+    if (!card) return res.status(404).json({ error: "Card not found" });
 
-  await user.save();
-  res.json({ message: "Card removed" });
+    const last4 = card.last4; // <-- declare it here
+
+    // Remove the card
+    user.paymentCards = (user.paymentCards || []).filter((c) => String(c._id) !== String(req.params.id));
+    await user.save();
+
+    // Send email
+    await sendProfileUpdateEmail(user.email, [`Card ending in ${last4} removed`]);
+
+    res.json({ message: "Card removed" });
+  } catch (err) {
+    console.error("Error sending card remove email:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
+
+
 
 /* ------------------- Addresses (protected) ------------------- */
 app.get("/api/addresses", auth, async (req, res) => {

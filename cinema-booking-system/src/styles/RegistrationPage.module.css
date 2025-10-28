@@ -123,3 +123,26 @@
     height: 0;
     overflow: hidden;
   }
+
+  .successDialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #cc3a23;
+    color: white;
+    padding: 20px 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    z-index: 9999;
+    text-align: center;
+    font-size: 1rem;
+    animation: fadeInOut 2s ease-in-out forwards;
+  }
+  
+  @keyframes fadeInOut {
+    0% { opacity: 0; transform: translate(-50%, -60%); }
+    10% { opacity: 1; transform: translate(-50%, -50%); }
+    90% { opacity: 1; transform: translate(-50%, -50%); }
+    100% { opacity: 0; transform: translate(-50%, -40%); }
+  }

@@ -15,8 +15,9 @@ import ReviewBookingPage from "./pages/ReviewBookingPage";
 import AdminHome from './pages/AdminHome';
 import OrderConfirmationPage from './pages/OrderConfirmationPage';
 import RegistrationPage from './pages/RegistrationPage';
-// ✅ add this
 import ProfilePage from './pages/ProfilePage';
+
+
 
 function App() {
   return (
@@ -36,8 +37,10 @@ function App() {
             <Route path="/review-booking" element={<ReviewBookingPage />} />
             <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
             <Route path="/signup" element={<RegistrationPage />} />
-            {/* ✅ add this route */}
             <Route path="/profile" element={<ProfilePage />} />
+
+
+            
           </Routes>
         </div>
       </Router>

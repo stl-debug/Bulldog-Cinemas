@@ -22,6 +22,7 @@ export default function RegistrationPage() {
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ type: '', text: '' });
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const onChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -66,9 +67,11 @@ export default function RegistrationPage() {
         console.error('Registration error:', data);
         setMsg({ type: 'error', text: data.error || data.message || `Registration failed: ${res.status} ${res.statusText}` });
       } else {
-        // Account created in MongoDB as inactive, redirect to home
-        console.log('Registration successful');
-        navigate('/');
+        setShowSuccess(true);
+        setTimeout(() => {
+          setShowSuccess(false);
+          navigate('/login'); // go to login page after 2 seconds
+        }, 2000);
       }
     } catch (err) {
       console.error('Network error:', err);
@@ -88,6 +91,12 @@ export default function RegistrationPage() {
         </div>
       )}
 
+{showSuccess && (
+        <div className={styles.successDialog}>
+          <p>Account creation successful! Redirecting to login page...</p>
+        </div>
+      )}
+      
       <form className={styles.form} onSubmit={handleSubmit} noValidate>
         <div className={styles.row}>
           <div className={styles.col}>

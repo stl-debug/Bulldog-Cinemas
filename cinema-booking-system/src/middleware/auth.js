@@ -93,7 +93,7 @@ router.post('/login', async (req, res) => {
         // 2️⃣ Require confirmed email
         if (user.status !== 'Active')
             return res.status(403).json({ error: 'Please confirm your email first' });
-
+        
         // 3️⃣ Check password
         const ok = await bcrypt.compare(password, user.passwordHash);
         if (!ok) return res.status(401).json({ error: 'Invalid email or password' });

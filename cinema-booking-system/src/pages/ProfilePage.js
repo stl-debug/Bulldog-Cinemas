@@ -566,7 +566,7 @@ export default function ProfilePage() {
             ) : (
               <form onSubmit={handleChangePassword} className={styles.form}>
                 <label className={styles.label}>
-                  Current Password
+                  Current Password *
                   <input
                     type="password"
                     name="oldPassword"
@@ -579,7 +579,7 @@ export default function ProfilePage() {
                 </label>
 
                 <label className={styles.label}>
-                  New Password
+                  New Password *
                   <input
                     type="password"
                     name="newPassword"
@@ -593,7 +593,7 @@ export default function ProfilePage() {
                 </label>
 
                 <label className={styles.label}>
-                  Confirm New Password
+                  Confirm New Password *
                   <input
                     type="password"
                     name="confirmPassword"
@@ -666,7 +666,7 @@ export default function ProfilePage() {
             ) : (
               <form onSubmit={handleSaveAddress} className={styles.form}>
                 <label className={styles.label}>
-                  Address Line 1
+                  Address Line 1 *
                   <input
                     type="text"
                     name="line1"
@@ -691,7 +691,7 @@ export default function ProfilePage() {
 
                 <div className={styles.grid2}>
                   <label className={styles.label}>
-                    City
+                    City *
                     <input
                       type="text"
                       name="city"
@@ -703,7 +703,7 @@ export default function ProfilePage() {
                   </label>
 
                   <label className={styles.label}>
-                    State
+                    State *
                     <input
                       type="text"
                       name="state"
@@ -717,7 +717,7 @@ export default function ProfilePage() {
 
                 <div className={styles.grid2}>
                   <label className={styles.label}>
-                    ZIP Code
+                    ZIP Code *
                     <input
                       type="text"
                       name="zip"
@@ -729,7 +729,7 @@ export default function ProfilePage() {
                   </label>
 
                   <label className={styles.label}>
-                    Country
+                    Country *
                     <input
                       type="text"
                       name="country"
@@ -822,7 +822,7 @@ export default function ProfilePage() {
 
             <form onSubmit={handleSaveCard} className={styles.form}>
               <label className={styles.label}>
-                Cardholder name
+                Cardholder name *
                 <input
                   type="text"
                   placeholder="Name on card"
@@ -835,7 +835,7 @@ export default function ProfilePage() {
 
               {!editingCardId && (
                 <label className={styles.label}>
-                  Card number
+                  Card number *
                   <input
                     type="text"
                     inputMode="numeric"
@@ -853,7 +853,7 @@ export default function ProfilePage() {
 
               <div className={styles.grid2}>
                 <label className={styles.label}>
-                  Exp. month
+                  Exp. month *
                   <input
                     type="number"
                     min="1"
@@ -867,7 +867,7 @@ export default function ProfilePage() {
                 </label>
 
                 <label className={styles.label}>
-                  Exp. year
+                  Exp. year *
                   <input
                     type="number"
                     min={new Date().getFullYear()}

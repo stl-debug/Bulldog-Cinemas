@@ -49,7 +49,7 @@ function LoginPage() {
         }
       
       } else {
-        setError(data.message || 'Invalid login credentials');
+        setError(data.error || 'Invalid login credentials');
       }
     } catch (err) {
       console.error('Login error:', err);
@@ -62,7 +62,7 @@ function LoginPage() {
       <div className={styles.loginCard}>
         <h2 className={styles.title}>Login to Bulldog Cinemas</h2>
         <form onSubmit={handleSubmit} className={styles.form}>
-          {error && <p className={styles.error}>{error}</p>}
+        {error && <p className={styles.error}>{error}</p>}
 
           <label className={styles.label}>Email *</label>
           <input
