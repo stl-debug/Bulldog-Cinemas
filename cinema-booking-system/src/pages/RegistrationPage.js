@@ -1,9 +1,7 @@
-// src/pages/RegistrationPage.js
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from '../styles/RegistrationPage.module.css';
 
-// Works in Vite or CRA; falls back to local backend server
 const API_BASE =
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
   (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_URL) ||
@@ -51,7 +49,6 @@ export default function RegistrationPage() {
       const res = await fetch(`${API_BASE}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Your backend expects: firstName, lastName, email, password, promotions
         body: JSON.stringify({
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
