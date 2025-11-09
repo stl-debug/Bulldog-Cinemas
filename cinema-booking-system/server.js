@@ -9,6 +9,8 @@ require("dotenv").config();
 
 const Movie = require("./src/models/Movie");
 const User = require("./src/models/User");
+const Showtime = require("./src/models/Showtime");
+const Promotion = require("./src/models/Promotion");
 const { encryptText } = require("./src/utils/crypto"); 
 
 const app = express();
@@ -518,6 +520,77 @@ app.delete("/api/addresses/:id", auth, async (req, res) => {
 
   await user.save();
   res.json({ message: "Address removed" });
+});
+
+// Create showtime
+app.post("api/showtimes", async (req, res) => {
+  try {
+    const {movieID, showroom, date, capacity} = req.body;
+    const conflict = await Showtime.findOne({showroom, date});
+    if (conflict) return res.status(400).json({error: "Showroom already booked."});
+    
+    const showtime = new Showtime({ movie: movieID, showroom, date, capacity });
+    await showtime.save();
+    res.status(201).json(showtime);
+  }catch (err) {
+    res.status(500).json({error: err.message});
+  }
+});
+
+// get showtimes by movie ID
+app.get("/api/showtimes/:id", async (req, res) => {
+  const showtimes = await Showtime.find({movie: req.params.id});
+  res.json(showtimes);
+});
+
+// create promotion
+app.post("/api/promotions", async (req, res) => {
+  try {
+    const { code, discount, startDate, endDate } = req.body;
+    if (!code || !discount || !startDate || !endDate)
+      return res.status(400).json({ error: "All fields required." });
+
+    const promo = new Promotion({ code, discount, startDate, endDate });
+    await promo.save();
+    res.status(201).json(promo);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Send email to subscribed users
+app.post("/api/promotions/send", async (req, res) => {
+  try {
+    const { code } = req.body;
+    const promo = await Promotion.findOne({ code });
+    if (!promo) return res.status(404).json({ error: "Promotion not found" });
+
+    const users = await User.find({ promotions: true });
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+
+    for (const u of users) {
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM,
+        to: u.email,
+        subject: "New Promotion from Bulldog Cinemas!",
+        html: `
+          <h2>🎉 ${promo.code} - ${promo.discount}% OFF</h2>
+          <p>Valid from ${promo.startDate.toDateString()} to ${promo.endDate.toDateString()}</p>
+        `
+      });
+    }
+
+    res.json({ message: "Promotions sent successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 //Misc
