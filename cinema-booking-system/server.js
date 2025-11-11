@@ -523,7 +523,7 @@ app.delete("/api/addresses/:id", auth, async (req, res) => {
 });
 
 // Create showtime
-app.post("api/showtimes", async (req, res) => {
+app.post("/api/showtimes", async (req, res) => {
   try {
     const {movieID, showroom, date, capacity} = req.body;
     const conflict = await Showtime.findOne({showroom, date});
