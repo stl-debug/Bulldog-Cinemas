@@ -11,20 +11,19 @@ const Movie = require("./src/models/Movie");
 const User = require("./src/models/User");
 const Showtime = require("./src/models/Showtime");
 const Promotion = require("./src/models/Promotion");
-const { encryptText } = require("./src/utils/crypto"); 
-
 const Theatre = require("./src/models/Theatre");
-const crypto = require("crypto");
-const checksum = (str) => crypto.createHash("sha1").update(str).digest("hex");
-
 const Booking = require("./src/models/Booking");
+
+const { encryptText } = require("./src/utils/crypto");
+const crypto = require("crypto");
 const { randomUUID } = require("crypto");
 
-
+const checksum = (str) => crypto.createHash("sha1").update(str).digest("hex");
+const asObjectId = (v) => new mongoose.Types.ObjectId(String(v));
 
 const app = express();
 
-// Middleware
+/* ------------------------------- Middleware -------------------------------- */
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
@@ -34,7 +33,7 @@ app.use(
 );
 app.use(express.json());
 
-// Email Helpers
+/* --------------------------------- Email ----------------------------------- */
 function makeTransport() {
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -76,33 +75,43 @@ async function sendProfileUpdateEmail(userEmail, changes) {
     const html = `
       <h2>Your profile has been updated</h2>
       <p>The following fields were changed:</p>
-      <ul>
-        ${changes.map(change => `<li>${change}</li>`).join('')}
-      </ul>
+      <ul>${changes.map((c) => `<li>${c}</li>`).join("")}</ul>
       <p>If you did not make these changes, please contact support immediately.</p>
     `;
-
     await transporter.sendMail({
       from: process.env.EMAIL_FROM,
       to: userEmail,
-      subject: 'Profile Update Notification',
+      subject: "Profile Update Notification",
       html,
     });
-
-    console.log(`Profile update email sent to ${userEmail}`);
   } catch (err) {
     console.error("Error sending profile update email:", err);
   }
 }
 
-
-// DB 
+/* -------------------------------- Database --------------------------------- */
 mongoose
   .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-// Movies
+/* ------------------------------ Small helpers ------------------------------ */
+async function cleanupExpiredHolds(showtimeId) {
+  const now = new Date();
+  await Showtime.updateOne(
+    { _id: showtimeId },
+    {
+      $set: {
+        "seats.$[s].status": "available",
+        "seats.$[s].heldBy": null,
+        "seats.$[s].heldUntil": null,
+      },
+    },
+    { arrayFilters: [{ "s.status": "held", "s.heldUntil": { $lte: now } }] }
+  );
+}
+
+/* --------------------------------- Movies ---------------------------------- */
 app.get("/api/movies", async (_req, res) => {
   try {
     const movies = await Movie.find({}).lean();
@@ -124,30 +133,34 @@ app.get("/api/movies/:id", async (req, res) => {
 
 app.post("/api/movies", async (req, res) => {
   try {
-    const newMovie = new Movie(req.body);
-    await newMovie.save();
-    res.status(201).json(newMovie);
+    const m = new Movie(req.body);
+    await m.save();
+    res.status(201).json(m);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-
-// Dates that have showtimes for a movie
+/* --------- Dates & showtimes for a movie (for UI step 1 → step 2) ---------- */
 app.get("/api/movies/:movieId/show-dates", async (req, res) => {
   try {
     const { movieId } = req.params;
     const dates = await Showtime.aggregate([
-      { $match: { movie: new mongoose.Types.ObjectId(movieId) } },
-      { $project: { d: { $dateToString: { format: "%Y-%m-%d", date: "$startTime", timezone: "UTC" } } } },
+      { $match: { movie: asObjectId(movieId) } },
+      {
+        $project: {
+          d: { $dateToString: { format: "%Y-%m-%d", date: "$startTime", timezone: "UTC" } },
+        },
+      },
       { $group: { _id: "$d" } },
-      { $sort: { _id: 1 } }
+      { $sort: { _id: 1 } },
     ]);
-    res.json(dates.map(d => d._id));
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    res.json(dates.map((d) => d._id));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Showtimes for a specific date (movie page → time buttons)
 app.get("/api/movies/:movieId/showtimes", async (req, res) => {
   try {
     const { movieId } = req.params;
@@ -155,35 +168,40 @@ app.get("/api/movies/:movieId/showtimes", async (req, res) => {
     if (!date) return res.status(400).json({ error: "Missing ?date=YYYY-MM-DD" });
 
     const start = new Date(`${date}T00:00:00.000Z`);
-    const end = new Date(start); end.setUTCDate(end.getUTCDate() + 1);
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 1);
 
     const shows = await Showtime.find(
-      { movie: movieId, startTime: { $gte: start, $lt: end } },
+      { movie: asObjectId(movieId), startTime: { $gte: start, $lt: end } },
       { movie: 1, movieTitle: 1, theatre: 1, showroom: 1, auditoriumID: 1, startTime: 1 }
     ).sort({ startTime: 1 });
 
     res.json(shows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Booking page needs the seat map
 app.get("/api/showtime/:showtimeId", async (req, res) => {
   try {
     const s = await Showtime.findById(req.params.showtimeId).lean();
     if (!s) return res.status(404).json({ error: "Showtime not found" });
     res.json({
-      _id: s._id, movie: s.movie, movieTitle: s.movieTitle,
-      theatre: s.theatre, showroom: s.showroom, auditoriumID: s.auditoriumID,
-      startTime: s.startTime, seats: s.seats
+      _id: s._id,
+      movie: s.movie,
+      movieTitle: s.movieTitle,
+      theatre: s.theatre,
+      showroom: s.showroom,
+      auditoriumID: s.auditoriumID,
+      startTime: s.startTime,
+      seats: s.seats,
     });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-
-
-
-// Auth
-// Register
+/* --------------------------------- Auth ------------------------------------ */
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { firstName, lastName, email, password, promotions } = req.body;
@@ -211,7 +229,6 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
-// Confirm email
 app.get("/api/auth/confirm/:token", async (req, res) => {
   try {
     const decoded = jwt.verify(req.params.token, process.env.JWT_SECRET);
@@ -219,61 +236,20 @@ app.get("/api/auth/confirm/:token", async (req, res) => {
     if (!user) return res.status(404).send("User not found");
     user.status = "Active";
     await user.save();
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Account Confirmation</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              height: 100vh;
-              margin: 0;
-              background: linear-gradient(180deg, #111, #440000);
-            }
-            .container {
-              background: rgba(28, 28, 28, 0.95);
-              padding: 2rem 3rem;
-              border-radius: 10px;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-              text-align: center;
-            }
-            h1 {
-              color: #ffd700;
-              margin: 0 0 1rem 0;
-            }
-            p {
-              color: #ddd;
-              margin: 0.5rem 0;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>Account Confirmation Successful!</h1>
-            <p>You may close this window.</p>
-            <p>If already logged in, refresh your browser to see your updated status.</p>
-          </div>
-        </body>
-      </html>
-    `);
+    res.send(`<!DOCTYPE html><html><head><title>Account Confirmation</title>
+      <style>body{font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:linear-gradient(180deg,#111,#440000)}.container{background:rgba(28,28,28,.95);padding:2rem 3rem;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,.4);text-align:center}h1{color:#ffd700;margin:0 0 1rem 0}p{color:#ddd;margin:.5rem 0}</style>
+      </head><body><div class="container"><h1>Account Confirmation Successful!</h1>
+      <p>You may close this window.</p><p>If already logged in, refresh your browser to see your updated status.</p></div></body></html>`);
   } catch {
     res.status(400).send("Invalid or expired token");
   }
 });
 
-
-
-// Login
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ error: "User not found" });
-    
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: "Incorrect password" });
@@ -285,7 +261,6 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-// Forgot password
 app.post("/api/auth/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
@@ -304,7 +279,6 @@ app.post("/api/auth/forgot-password", async (req, res) => {
   }
 });
 
-// Reset password
 app.post("/api/auth/reset-password", async (req, res) => {
   try {
     const { token, password } = req.body;
@@ -330,15 +304,17 @@ app.post("/api/auth/reset-password", async (req, res) => {
   }
 });
 
-// Inline auth middleware (uses JWT) 
+// Inline auth middleware
 async function auth(req, res, next) {
   try {
     const h = req.headers.authorization || "";
     if (!h.startsWith("Bearer ")) return res.status(401).json({ error: "Missing Authorization" });
     const token = h.split(" ")[1];
-    const payload = jwt.verify(token, process.env.JWT_SECRET); 
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findById(payload.id).select("_id email role status firstName lastName passwordChangedAt promotions addresses paymentCards");
+    const user = await User.findById(payload.id).select(
+      "_id email role status firstName lastName passwordChangedAt promotions addresses paymentCards"
+    );
     if (!user) return res.status(401).json({ error: "Unauthorized" });
     if (user.passwordChangedAt) {
       const issued = payload.iat * 1000;
@@ -347,16 +323,16 @@ async function auth(req, res, next) {
       }
     }
     req.user = { id: String(user._id), email: user.email, role: user.role };
-    req.userDoc = user; 
+    req.userDoc = user;
     next();
-  } catch {
-    res.status(401).json({ error: "Unauthorized" });
+  } catch (e) {
+    return res.status(401).json({ error: "Unauthorized" });
   }
 }
 
 // Profile
-app.get("/api/auth/profile", auth, async (_req, res) => {
-  const u = _req.userDoc;
+app.get("/api/auth/profile", auth, async (req, res) => {
+  const u = req.userDoc;
   res.json({
     id: u._id,
     firstName: u.firstName,
@@ -369,7 +345,6 @@ app.get("/api/auth/profile", auth, async (_req, res) => {
   });
 });
 
-
 app.put("/api/auth/profile", auth, async (req, res) => {
   try {
     const { firstName, lastName, password, oldPassword, promotions, address } = req.body;
@@ -377,21 +352,15 @@ app.put("/api/auth/profile", auth, async (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found" });
 
     let changes = [];
-
     if (firstName !== undefined && firstName !== user.firstName) {
-      user.firstName = firstName;
-      changes.push("First name updated");
+      user.firstName = firstName; changes.push("First name updated");
     }
     if (lastName !== undefined && lastName !== user.lastName) {
-      user.lastName = lastName;
-      changes.push("Last name updated");
+      user.lastName = lastName; changes.push("Last name updated");
     }
     if (typeof promotions === "boolean" && promotions !== user.promotions) {
-      user.promotions = promotions;
-      changes.push("Promotions preference updated");
+      user.promotions = promotions; changes.push("Promotions preference updated");
     }
-
-    // Handle password change
     if (password) {
       if (!oldPassword) return res.status(400).json({ error: "Old password is required to change password" });
       const valid = await bcrypt.compare(oldPassword, user.passwordHash);
@@ -400,19 +369,13 @@ app.put("/api/auth/profile", auth, async (req, res) => {
       user.passwordChangedAt = new Date();
       changes.push("Password updated");
     }
-
-    // Handle address update
     if (address !== undefined) {
-      user.addresses = [address]; // Replace existing addresses
+      user.addresses = [address];
       changes.push("Address updated");
     }
 
     await user.save();
-
-    // Send notification if any changes
-    if (changes.length > 0) {
-      await sendProfileUpdateEmail(user.email, changes);
-    }
+    if (changes.length > 0) await sendProfileUpdateEmail(user.email, changes);
 
     res.json({ message: "Profile updated", changes });
   } catch (err) {
@@ -420,8 +383,7 @@ app.put("/api/auth/profile", auth, async (req, res) => {
   }
 });
 
-//Payment cards (protected)
-// List masked cards
+/* ------------------------------ Payment cards ------------------------------ */
 app.get("/api/payment-cards", auth, async (req, res) => {
   const user = await User.findById(req.user.id).lean();
   if (!user) return res.status(404).json({ error: "User not found" });
@@ -437,7 +399,6 @@ app.get("/api/payment-cards", auth, async (req, res) => {
   );
 });
 
-// Add card (encrypts PAN; stores safe metadata)
 app.put("/api/payment-cards", auth, async (req, res) => {
   const { cardNumber, cardHolderName, expiryMonth, expiryYear } = req.body || {};
   if (!cardNumber || !/^\d{12,19}$/.test(String(cardNumber))) {
@@ -447,7 +408,6 @@ app.put("/api/payment-cards", auth, async (req, res) => {
 
   const user = await User.findById(req.user.id);
   if (!user) return res.status(404).json({ error: "User not found" });
-
   if (!Array.isArray(user.paymentCards)) user.paymentCards = [];
   if (user.paymentCards.length >= 4) return res.status(400).json({ error: "Max 4 cards allowed" });
 
@@ -463,7 +423,6 @@ app.put("/api/payment-cards", auth, async (req, res) => {
   });
 
   await user.save();
-
   try {
     await sendProfileUpdateEmail(user.email, [`New card ending in ${last4} added`]);
   } catch (err) {
@@ -473,7 +432,6 @@ app.put("/api/payment-cards", auth, async (req, res) => {
   res.json({ message: "Card added" });
 });
 
-// Update card (non-sensitive fields)
 app.patch("/api/payment-cards/:id", auth, async (req, res) => {
   const { id } = req.params;
   const { cardHolderName, expiryMonth, expiryYear } = req.body || {};
@@ -491,25 +449,19 @@ app.patch("/api/payment-cards/:id", auth, async (req, res) => {
   res.json({ message: "Card updated" });
 });
 
-// Delete card
 app.delete("/api/payment-cards/:id", auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    // Find the card first
     const card = (user.paymentCards || []).find((c) => String(c._id) === String(req.params.id));
     if (!card) return res.status(404).json({ error: "Card not found" });
 
     const last4 = card.last4;
-
-    // Remove the card
     user.paymentCards = (user.paymentCards || []).filter((c) => String(c._id) !== String(req.params.id));
     await user.save();
 
-    // Send email
     await sendProfileUpdateEmail(user.email, [`Card ending in ${last4} removed`]);
-
     res.json({ message: "Card removed" });
   } catch (err) {
     console.error("Error sending card remove email:", err);
@@ -517,8 +469,7 @@ app.delete("/api/payment-cards/:id", auth, async (req, res) => {
   }
 });
 
-
-//Addresses (protected) 
+/* -------------------------------- Addresses -------------------------------- */
 app.get("/api/addresses", auth, async (req, res) => {
   const user = await User.findById(req.user.id).lean();
   if (!user) return res.status(404).json({ error: "User not found" });
@@ -580,7 +531,7 @@ app.delete("/api/addresses/:id", auth, async (req, res) => {
   res.json({ message: "Address removed" });
 });
 
-// ADMIN: create a showtime by snapshotting seats from theatre/auditorium
+/* ------------------------- Admin: create a showtime ------------------------- */
 app.post("/api/showtimes", async (req, res) => {
   try {
     const { movieId, theatreId, auditoriumID, startTime, showroom } = req.body;
@@ -594,18 +545,17 @@ app.post("/api/showtimes", async (req, res) => {
     const theatre = await Theatre.findById(theatreId).lean();
     if (!theatre) return res.status(404).json({ error: "Theatre not found" });
 
-    const aud = (theatre.auditoriums || []).find(a => a.auditoriumID === auditoriumID);
+    const aud = (theatre.auditoriums || []).find((a) => a.auditoriumID === auditoriumID);
     if (!aud) return res.status(404).json({ error: "Auditorium not found in theatre" });
 
-    // prevent double-booking same auditorium/time
     const conflict = await Showtime.findOne({
       theatre: theatre._id,
       auditoriumID,
-      startTime: new Date(startTime)
+      startTime: new Date(startTime),
     });
     if (conflict) return res.status(400).json({ error: "This auditorium is already booked at that time." });
 
-    const seats = (aud.seats || []).map(s => ({ row: s.rowLabel, number: s.seatNumber, status: "available" }));
+    const seats = (aud.seats || []).map((s) => ({ row: s.rowLabel, number: s.seatNumber, status: "available" }));
     if (seats.length === 0) return res.status(400).json({ error: "No seats defined for this auditorium" });
 
     const showtime = new Showtime({
@@ -617,7 +567,7 @@ app.post("/api/showtimes", async (req, res) => {
       startTime: new Date(startTime),
       layoutVersion: aud.layoutVersion || 1,
       layoutChecksum: checksum(JSON.stringify(aud.seats || [])),
-      seats
+      seats,
     });
 
     await showtime.save();
@@ -627,14 +577,183 @@ app.post("/api/showtimes", async (req, res) => {
   }
 });
 
-
-// get showtimes by movie ID
 app.get("/api/showtimes/:id", async (req, res) => {
-  const showtimes = await Showtime.find({movie: req.params.id});
+  const showtimes = await Showtime.find({ movie: req.params.id });
   res.json(showtimes);
 });
 
-// create promotion
+/* --------------------------- Seat hold / purchase --------------------------- */
+// Hold seats (requires auth)
+app.post("/api/showtime/:id/hold", auth, async (req, res) => {
+  try {
+    const { seats, minutes = 10 } = req.body || {};
+    if (!Array.isArray(seats) || seats.length === 0)
+      return res.status(400).json({ error: "seats[] required" });
+
+    const showtimeId = req.params.id;
+    await cleanupExpiredHolds(showtimeId);
+
+    const holdId = randomUUID();
+    const expiresAt = new Date(Date.now() + minutes * 60 * 1000);
+
+    const held = [];
+    for (const s of seats) {
+      const updated = await Showtime.findOneAndUpdate(
+        {
+          _id: showtimeId,
+          seats: {
+            $elemMatch: {
+              row: s.row,
+              number: s.number,
+              $or: [{ status: "available" }, { status: "held", heldUntil: { $lte: new Date() } }],
+            },
+          },
+        },
+        {
+          $set: {
+            "seats.$.status": "held",
+            "seats.$.heldBy": holdId,
+            "seats.$.heldUntil": expiresAt,
+          },
+        },
+        { new: false }
+      );
+
+      if (!updated) {
+        for (const r of held) {
+          await Showtime.updateOne(
+            { _id: showtimeId, "seats.row": r.row, "seats.number": r.number, "seats.heldBy": holdId },
+            {
+              $set: {
+                "seats.$.status": "available",
+                "seats.$.heldBy": null,
+                "seats.$.heldUntil": null,
+              },
+            }
+          );
+        }
+        return res.status(409).json({ error: `Seat ${s.row}${s.number} unavailable` });
+      }
+      held.push({ row: s.row, number: s.number });
+    }
+
+    res.status(201).json({ holdId, expiresAt, seats: held });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Release a hold (requires auth)
+app.delete("/api/showtime/:id/hold/:holdId", auth, async (req, res) => {
+  try {
+    const { id, holdId } = req.params;
+    await Showtime.updateOne(
+      { _id: id },
+      {
+        $set: {
+          "seats.$[h].status": "available",
+          "seats.$[h].heldBy": null,
+          "seats.$[h].heldUntil": null,
+        },
+      },
+      { arrayFilters: [{ "h.heldBy": holdId }] }
+    );
+    res.json({ released: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Purchase seats (requires auth) — booking tied to logged-in user
+app.post("/api/showtime/:id/purchase", auth, async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    const { holdId, seats, total = 0, paymentLast4 = "" } = req.body || {};
+    if (!holdId || !Array.isArray(seats) || seats.length === 0)
+      return res.status(400).json({ error: "holdId and seats[] required" });
+
+    const showtimeId = req.params.id;
+    await cleanupExpiredHolds(showtimeId);
+
+    session.startTransaction();
+
+    // Mark each seat SOLD if it's still held by this hold and not expired
+    for (const s of seats) {
+      const ok = await Showtime.findOneAndUpdate(
+        {
+          _id: showtimeId,
+          seats: {
+            $elemMatch: {
+              row: s.row,
+              number: s.number,
+              status: "held",
+              heldBy: holdId,
+              heldUntil: { $gt: new Date() },
+            },
+          },
+        },
+        {
+          $set: {
+            "seats.$.status": "sold",
+            "seats.$.heldBy": null,
+            "seats.$.heldUntil": null,
+          },
+        },
+        { new: false, session }
+      );
+      if (!ok) {
+        await session.abortTransaction();
+        return res.status(409).json({ error: `Seat ${s.row}${s.number} not held (or hold expired)` });
+      }
+    }
+
+    const st = await Showtime.findById(showtimeId).session(session);
+    if (!st) {
+      await session.abortTransaction();
+      return res.status(404).json({ error: "Showtime not found" });
+    }
+
+    const userId = asObjectId(req.user.id);
+
+    const [booking] = await Booking.create(
+      [
+        {
+          user: userId,
+          showtime: st._id,
+          movieTitle: st.movieTitle,
+          theatreName: String(st.theatre),
+          showroom: st.showroom,
+          startTime: st.startTime,
+          seats,
+          total,
+          paymentLast4,
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction();
+    res.status(201).json({ message: "Purchased", bookingId: booking._id });
+  } catch (err) {
+    try { await session.abortTransaction(); } catch {}
+    res.status(500).json({ error: err.message });
+  } finally {
+    session.endSession();
+  }
+});
+
+// List the logged-in user's bookings (explicit ObjectId)
+app.get("/api/my/bookings", auth, async (req, res) => {
+  try {
+    const userId = asObjectId(req.user.id);
+    const list = await Booking.find({ user: userId }).sort({ createdAt: -1 }).lean();
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* -------------------------------- Promotions ------------------------------- */
 app.post("/api/promotions", async (req, res) => {
   try {
     const { code, discount, startDate, endDate } = req.body;
@@ -649,7 +768,6 @@ app.post("/api/promotions", async (req, res) => {
   }
 });
 
-// Send email to subscribed users
 app.post("/api/promotions/send", async (req, res) => {
   try {
     const { code } = req.body;
@@ -660,10 +778,7 @@ app.post("/api/promotions/send", async (req, res) => {
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: process.env.SMTP_PORT,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
     });
 
     for (const u of users) {
@@ -674,7 +789,7 @@ app.post("/api/promotions/send", async (req, res) => {
         html: `
           <h2>🎉 ${promo.code} - ${promo.discount}% OFF</h2>
           <p>Valid from ${promo.startDate.toDateString()} to ${promo.endDate.toDateString()}</p>
-        `
+        `,
       });
     }
 
@@ -684,10 +799,10 @@ app.post("/api/promotions/send", async (req, res) => {
   }
 });
 
-//Misc
+/* --------------------------------- Misc ------------------------------------ */
 app.post("/api/auth/logout", (_req, res) => res.json({ message: "Logged out" }));
 app.get("/api/test", (_req, res) => res.send("API is working"));
 
-//Start
+/* --------------------------------- Start ----------------------------------- */
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
