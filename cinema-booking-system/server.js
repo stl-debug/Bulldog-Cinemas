@@ -97,18 +97,65 @@ mongoose
 app.get("/api/movies", async (_req, res) => {
   try {
     const movies = await Movie.find({}).lean();
-    res.json(movies);
+
+    const moviesWithShowtimes = await Promise.all(
+      movies.map(async (movie) => {
+        const showtimes = await Showtime.find({ movie: movie._id }).lean();
+
+        movie.showtimes = showtimes.map(s => ({
+          time: new Date(s.date).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'America/New_York', // Force ET
+          }),
+          showroom: s.showroom,
+          capacity: s.capacity,
+          bookedSeats: s.bookedSeats
+        }));
+
+        return movie;
+      })
+    );
+
+    res.json(moviesWithShowtimes);
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+
+
 app.get("/api/movies/:id", async (req, res) => {
   try {
-    const movie = await Movie.findById(req.params.id).lean();
+    const movieID = req.params.id;
+
+    // Fetch the movie
+    const movie = await Movie.findById(movieID).lean();
     if (!movie) return res.status(404).json({ message: "Movie not found" });
+
+    // Fetch showtimes from DB (use 'new' with ObjectId)
+    const showtimes = await Showtime.find({ movie: new mongoose.Types.ObjectId(movieID) }).lean();
+
+    // Map to desired format
+    const liveShowtimes = showtimes.map(s => ({
+    time: new Date(s.date).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'America/New_York', // cinema timezone
+  }),
+      showroom: s.showroom,
+      capacity: s.capacity,
+      bookedSeats: s.bookedSeats
+    }));
+
+    // Overwrite embedded showtimes
+    movie.showtimes = liveShowtimes;
+
     res.json(movie);
+
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
