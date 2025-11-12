@@ -17,6 +17,10 @@ const Theatre = require("./src/models/Theatre");
 const crypto = require("crypto");
 const checksum = (str) => crypto.createHash("sha1").update(str).digest("hex");
 
+const Booking = require("./src/models/Booking");
+const { randomUUID } = require("crypto");
+
+
 
 const app = express();
 
