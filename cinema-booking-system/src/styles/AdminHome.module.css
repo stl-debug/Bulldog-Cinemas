@@ -49,4 +49,142 @@
     border-color: #ffd700;
     color: #ffd700;
   }
+
+  .formContainer {
+    margin-top: 2rem;
+    width: 100%;
+    max-width: 600px;
+    background-color: #1a1a1a;
+    padding: 1.5rem;
+    border-radius: 10px;
+    border: 1px solid #555;
+  }
+
+  .formContainer h2 {
+    color: #ffd700;
+    margin-bottom: 1.5rem;
+  }
+
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    color: white;
+    font-size: 0.85rem;
+  }
+
+  .input,
+  .textarea,
+  select {
+    padding: 0.3rem 0.5rem;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background-color: #222;
+    color: white;
+    font-size: 0.8rem;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .input:focus,
+  .textarea:focus,
+  select:focus {
+    outline: none;
+    border-color: #ffd700;
+  }
+
+  .textarea {
+    resize: vertical;
+    min-height: 40px;
+    max-height: 100px;
+  }
+
+  .arraySection {
+    margin-top: 0.5rem;
+  }
+
+  .arrayItem {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    align-items: center;
+  }
+
+  .arrayItem .input {
+    flex: 1;
+  }
+
+  .addBtn,
+  .removeBtn {
+    padding: 0.5rem 1rem;
+    border: 1px solid #555;
+    border-radius: 5px;
+    background-color: #333;
+    color: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: 0.3s;
+  }
+
+  .addBtn:hover {
+    background-color: #444;
+    border-color: #ffd700;
+    color: #ffd700;
+  }
+
+  .removeBtn {
+    background-color: #5a0a0a;
+    border-color: #7a0d0d;
+  }
+
+  .removeBtn:hover {
+    background-color: #7a0d0d;
+    border-color: #9a0f0f;
+  }
+
+  .submitBtn {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: #ffd700;
+    color: #000;
+    border: none;
+    border-radius: 5px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+
+  .submitBtn:hover:not(:disabled) {
+    background-color: #ffed4e;
+  }
+
+  .submitBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .errorMsg {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background-color: #5a0a0a;
+    color: #ff6b6b;
+    border: 1px solid #7a0d0d;
+    border-radius: 5px;
+  }
+
+  .successMsg {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background-color: #0a5a0a;
+    color: #6bff6b;
+    border: 1px solid #0d7a0d;
+    border-radius: 5px;
+  }
   

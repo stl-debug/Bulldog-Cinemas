@@ -1,9 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import MovieList from '../components/MovieList';
 import styles from '../styles/HomePage.module.css';
+import { useNavigate } from 'react-router-dom';
+import { UserContext } from '../context/UserContext';
 
 
 function HomePage() {
+    const navigate = useNavigate();
+    const { user } = useContext(UserContext);
+    
+    useEffect(() => {
+        if (user?.role === 'admin') {
+            navigate('/admin-home');
+        }
+    }, [user, navigate]);
+
     const [movies, setMovies] = useState([]);
 
     useEffect(() => {

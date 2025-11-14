@@ -18,7 +18,7 @@ const app = express();
 // Middleware
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  origin: process.env.FRONTEND_URL || "http://localhost:3000",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
   })
@@ -170,6 +170,21 @@ app.post("/api/movies", async (req, res) => {
   }
 });
 
+// Delete movie
+app.delete("/api/movies/:id", async (req, res) => {
+  try {
+    const movie = await Movie.findByIdAndDelete(req.params.id);
+    if (!movie) {
+      return res.status(404).json({ error: "Movie not found" });
+    }
+    // Also delete associated showtimes
+    await Showtime.deleteMany({ movie: req.params.id });
+    res.json({ message: "Movie deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Auth
 // Register
 app.post("/api/auth/register", async (req, res) => {
@@ -261,7 +276,7 @@ app.post("/api/auth/login", async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ error: "User not found" });
-    
+
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: "Incorrect password" });
@@ -572,15 +587,80 @@ app.delete("/api/addresses/:id", auth, async (req, res) => {
 // Create showtime
 app.post("/api/showtimes", async (req, res) => {
   try {
-    const {movieID, showroom, date, capacity} = req.body;
-    const conflict = await Showtime.findOne({showroom, date});
-    if (conflict) return res.status(400).json({error: "Showroom already booked."});
+    const {movieID, theatre, showroom, auditoriumID, date, startTime, layoutVersion, layoutChecksum, capacity} = req.body;
     
-    const showtime = new Showtime({ movie: movieID, showroom, date, capacity });
+    // Get movie title
+    const movie = await Movie.findById(movieID);
+    if (!movie) return res.status(404).json({error: "Movie not found"});
+    
+    // Check for conflict: same theatre at the same time
+    const showtimeDate = startTime ? new Date(startTime) : new Date(date);
+    
+    // Check for conflicts: same theatre and same startTime, or same showroom and same time
+    const conflictConditions = [];
+    
+    if (theatre) {
+      conflictConditions.push({ theatre, startTime: showtimeDate });
+      conflictConditions.push({ theatre, date: showtimeDate });
+    }
+    
+    if (showroom) {
+      conflictConditions.push({ showroom, startTime: showtimeDate });
+      conflictConditions.push({ showroom, date: showtimeDate });
+    }
+    
+    const conflict = conflictConditions.length > 0 
+      ? await Showtime.findOne({ $or: conflictConditions })
+      : await Showtime.findOne({ startTime: showtimeDate });
+    
+    if (conflict) {
+      return res.status(400).json({error: "There is already a showtime in this showroom at this time."});
+    }
+    
+    const showtimeData = {
+      movie: movieID,
+      movieTitle: movie.title,
+      showroom,
+      date: showtimeDate,
+      startTime: showtimeDate,
+      capacity: capacity || 100
+    };
+    
+    if (theatre) showtimeData.theatre = theatre;
+    if (auditoriumID) showtimeData.auditoriumID = auditoriumID;
+    if (layoutVersion) showtimeData.layoutVersion = layoutVersion;
+    if (layoutChecksum) showtimeData.layoutChecksum = layoutChecksum;
+    
+    const showtime = new Showtime(showtimeData);
     await showtime.save();
     res.status(201).json(showtime);
   }catch (err) {
     res.status(500).json({error: err.message});
+  }
+});
+
+// Delete showtime (must come before GET to avoid route conflicts)
+app.delete("/api/showtimes/:id", async (req, res) => {
+  try {
+    const showtimeId = req.params.id;
+    console.log('DELETE /api/showtimes/:id - Received ID:', showtimeId);
+    
+    // Check if ID is valid MongoDB ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(showtimeId)) {
+      return res.status(400).json({ error: "Invalid showtime ID format" });
+    }
+    
+    const showtime = await Showtime.findByIdAndDelete(showtimeId);
+    if (!showtime) {
+      console.log('Showtime not found with ID:', showtimeId);
+      return res.status(404).json({ error: "Showtime not found" });
+    }
+    
+    console.log('Showtime deleted successfully:', showtimeId);
+    res.json({ message: "Showtime deleted successfully" });
+  } catch (err) {
+    console.error('Error deleting showtime:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -590,17 +670,104 @@ app.get("/api/showtimes/:id", async (req, res) => {
   res.json(showtimes);
 });
 
+// get all promotions
+app.get("/api/promotions", async (req, res) => {
+  try {
+    const promotions = await Promotion.find({}).lean();
+    res.json(promotions);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete promotion
+app.delete("/api/promotions/:id", async (req, res) => {
+  try {
+    const promotion = await Promotion.findByIdAndDelete(req.params.id);
+    if (!promotion) {
+      return res.status(404).json({ error: "Promotion not found" });
+    }
+    res.json({ message: "Promotion deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // create promotion
 app.post("/api/promotions", async (req, res) => {
   try {
-    const { code, discount, startDate, endDate } = req.body;
-    if (!code || !discount || !startDate || !endDate)
-      return res.status(400).json({ error: "All fields required." });
+    console.log('Raw request body:', req.body);
+    const { _id, description, discountType, discountValue, validFrom, validTo } = req.body;
+    console.log('Extracted fields:', { _id, description, discountType, discountValue, validFrom, validTo });
+    
+    // Validate required fields - be more lenient with types
+    if (!_id || String(_id).trim() === '') {
+      console.log('Validation failed: _id');
+      return res.status(400).json({ error: "Promotion code (_id) is required." });
+    }
+    if (!description || String(description).trim() === '') {
+      console.log('Validation failed: description');
+      return res.status(400).json({ error: "Description is required." });
+    }
+    if (!discountType || (discountType !== 'PERCENT' && discountType !== 'FIXED')) {
+      console.log('Validation failed: discountType', discountType);
+      return res.status(400).json({ error: "Valid discount type (PERCENT or FIXED) is required." });
+    }
+    if (discountValue === undefined || discountValue === null || discountValue === '') {
+      console.log('Validation failed: discountValue', discountValue);
+      return res.status(400).json({ error: "Discount value is required." });
+    }
+    if (!validFrom) {
+      console.log('Validation failed: validFrom');
+      return res.status(400).json({ error: "Valid from date is required." });
+    }
+    if (!validTo) {
+      console.log('Validation failed: validTo');
+      return res.status(400).json({ error: "Valid to date is required." });
+    }
+    
+    const numValue = Number(discountValue);
+    if (isNaN(numValue) || numValue <= 0) {
+      console.log('Validation failed: discountValue not a positive number', numValue);
+      return res.status(400).json({ error: "Discount value must be a positive number." });
+    }
+    
+    console.log('All validations passed, proceeding...');
 
-    const promo = new Promotion({ code, discount, startDate, endDate });
+    // Check if promotion with this ID already exists
+    const existing = await Promotion.findById(_id);
+    if (existing) {
+      return res.status(400).json({ error: "A promotion with this code already exists." });
+    }
+
+    let validFromDate, validToDate;
+    try {
+      validFromDate = new Date(validFrom);
+      validToDate = new Date(validTo);
+    } catch (err) {
+      return res.status(400).json({ error: "Invalid date format." });
+    }
+    
+    if (isNaN(validFromDate.getTime())) {
+      return res.status(400).json({ error: `Invalid 'Valid From' date: ${validFrom}` });
+    }
+    if (isNaN(validToDate.getTime())) {
+      return res.status(400).json({ error: `Invalid 'Valid To' date: ${validTo}` });
+    }
+
+    const promo = new Promotion({ 
+      _id, 
+      description, 
+      discountType, 
+      discountValue: numValue, 
+      validFrom: validFromDate, 
+      validTo: validToDate 
+    });
     await promo.save();
+    console.log('Promotion saved successfully:', promo);
     res.status(201).json(promo);
   } catch (err) {
+    console.error('Error creating promotion:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -609,7 +776,8 @@ app.post("/api/promotions", async (req, res) => {
 app.post("/api/promotions/send", async (req, res) => {
   try {
     const { code } = req.body;
-    const promo = await Promotion.findOne({ code });
+    if (!code) return res.status(400).json({ error: "Promotion code required" });
+    const promo = await Promotion.findById(code);
     if (!promo) return res.status(404).json({ error: "Promotion not found" });
 
     const users = await User.find({ promotions: true });
@@ -622,14 +790,21 @@ app.post("/api/promotions/send", async (req, res) => {
       }
     });
 
+    const discountText = promo.discountType === "PERCENT" 
+      ? `${promo.discountValue}% OFF` 
+      : `$${promo.discountValue} OFF`;
+
     for (const u of users) {
       await transporter.sendMail({
         from: process.env.EMAIL_FROM,
         to: u.email,
         subject: "New Promotion from Bulldog Cinemas!",
         html: `
-          <h2>🎉 ${promo.code} - ${promo.discount}% OFF</h2>
-          <p>Valid from ${promo.startDate.toDateString()} to ${promo.endDate.toDateString()}</p>
+          <h2>🎉 ${promo._id} - ${discountText}</h2>
+          <div style="background-color: #333; color: #fff; padding: 15px; border-radius: 5px;">
+            <p style="color: #fff; margin: 0;">${promo.description}</p>
+          </div>
+          <p>Valid from ${new Date(promo.validFrom).toDateString()} to ${new Date(promo.validTo).toDateString()}</p>
         `
       });
     }
