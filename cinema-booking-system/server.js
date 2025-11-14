@@ -729,12 +729,20 @@ app.post("/api/showtimes", async (req, res) => {
     const showtimeDate = new Date(startTime);
     
     // Check for conflicts in same showroom at same time
+    // The unique index is on showroom + startTime (not date)
     const conflict = await Showtime.findOne({ 
-      showroom, 
-      startTime: showtimeDate 
+      showroom,
+      startTime: showtimeDate,
+      theatre: null // Only check legacy format showtimes
     });
     
     if (conflict) {
+      console.log('Conflict found:', {
+        conflictId: conflict._id,
+        conflictShowroom: conflict.showroom,
+        conflictStartTime: conflict.startTime,
+        newStartTime: showtimeDate
+      });
       return res.status(400).json({ error: "There is already a showtime in this showroom at this time." });
     }
 
@@ -745,6 +753,7 @@ app.post("/api/showtimes", async (req, res) => {
       showroom,
       auditoriumID: auditoriumID || showroom, // Use showroom as auditoriumID if not provided
       startTime: showtimeDate,
+      // Don't set date field - it's not in the schema and causes duplicate key errors
       layoutVersion: req.body.layoutVersion || 1,
       layoutChecksum: req.body.layoutChecksum || "",
       seats: [] // Empty for now, can be populated later
@@ -755,6 +764,17 @@ app.post("/api/showtimes", async (req, res) => {
     
   } catch (err) {
     console.error('Error creating showtime:', err);
+    
+    // Handle duplicate key error from old index
+    if (err.code === 11000) {
+      if (err.message.includes('showroom_1_date_1')) {
+        return res.status(400).json({ 
+          error: "Duplicate showtime detected. Please drop the old 'showroom_1_date_1' index from MongoDB, or ensure there are no existing showtimes with null date values for this showroom." 
+        });
+      }
+      return res.status(400).json({ error: "There is already a showtime in this showroom at this time." });
+    }
+    
     res.status(500).json({ error: err.message });
   }
 });
