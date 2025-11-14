@@ -89,7 +89,7 @@ async function sendProfileUpdateEmail(userEmail, changes) {
 
 // DB 
 mongoose
-  .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
@@ -102,16 +102,32 @@ app.get("/api/movies", async (_req, res) => {
       movies.map(async (movie) => {
         const showtimes = await Showtime.find({ movie: movie._id }).lean();
 
-        movie.showtimes = showtimes.map(s => ({
-          time: new Date(s.date).toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZone: 'America/New_York', // Force ET
-          }),
-          showroom: s.showroom,
-          capacity: s.capacity,
-          bookedSeats: s.bookedSeats
-        }));
+        movie.showtimes = showtimes.map(s => {
+          // Handle both old format (date field) and new format (startTime field)
+          const timeValue = s.startTime || s.date;
+          
+          if (!timeValue) {
+            return {
+              time: 'No Time Set',
+              showroom: s.showroom,
+              capacity: s.capacity || 100,
+              bookedSeats: s.bookedSeats || 0
+            };
+          }
+          
+          const timeDate = new Date(timeValue);
+          
+          return {
+            time: !isNaN(timeDate.getTime()) ? timeDate.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'America/New_York',
+            }) : 'Invalid Date',
+            showroom: s.showroom,
+            capacity: s.capacity || 100,
+            bookedSeats: s.bookedSeats || 0
+          };
+        });
 
         return movie;
       })
@@ -138,16 +154,32 @@ app.get("/api/movies/:id", async (req, res) => {
     const showtimes = await Showtime.find({ movie: new mongoose.Types.ObjectId(movieID) }).lean();
 
     // Map to desired format
-    const liveShowtimes = showtimes.map(s => ({
-    time: new Date(s.date).toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'America/New_York', // cinema timezone
-  }),
-      showroom: s.showroom,
-      capacity: s.capacity,
-      bookedSeats: s.bookedSeats
-    }));
+    const liveShowtimes = showtimes.map(s => {
+      // Handle both old format (date field) and new format (startTime field)  
+      const timeValue = s.startTime || s.date;
+      
+      if (!timeValue) {
+        return {
+          time: 'No Time Set',
+          showroom: s.showroom,
+          capacity: s.capacity || 100,
+          bookedSeats: s.bookedSeats || 0
+        };
+      }
+      
+      const timeDate = new Date(timeValue);
+      
+      return {
+        time: !isNaN(timeDate.getTime()) ? timeDate.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'America/New_York',
+        }) : 'Invalid Date',
+        showroom: s.showroom,
+        capacity: s.capacity || 100,
+        bookedSeats: s.bookedSeats || 0
+      };
+    });
 
     // Overwrite embedded showtimes
     movie.showtimes = liveShowtimes;
@@ -633,46 +665,96 @@ app.delete("/api/addresses/:id", auth, async (req, res) => {
 // ADMIN: create a showtime by snapshotting seats from theatre/auditorium
 app.post("/api/showtimes", async (req, res) => {
   try {
-    const { movieId, theatreId, auditoriumID, startTime, showroom } = req.body;
-    if (!movieId || !theatreId || !auditoriumID || !startTime) {
-      return res.status(400).json({ error: "movieId, theatreId, auditoriumID, startTime are required" });
+    // Support both old and new parameter names for backward compatibility
+    const movieId = req.body.movieId || req.body.movieID;
+    const theatreId = req.body.theatreId || req.body.theatre;
+    const auditoriumID = req.body.auditoriumID;
+    const startTime = req.body.startTime;
+    const showroom = req.body.showroom;
+    
+    console.log('Received parameters:', { movieId, theatreId, auditoriumID, startTime, showroom });
+    
+    // Check if we have the minimum required fields for legacy format
+    if (!movieId || !showroom || !startTime) {
+      return res.status(400).json({ error: "movieId (or movieID), showroom, and startTime are required" });
     }
+    
+    // If we have theatreId and auditoriumID, use new format with Theatre model
+    if (theatreId && auditoriumID) {
+      console.log('Using new format with Theatre model');
+      
+      const movie = await Movie.findById(movieId);
+      if (!movie) return res.status(404).json({ error: "Movie not found" });
 
+      const Theatre = require("./src/models/Theatre");
+      const theatre = await Theatre.findById(theatreId).lean();
+      if (!theatre) return res.status(404).json({ error: "Theatre not found" });
+
+      const aud = (theatre.auditoriums || []).find(a => a.auditoriumID === auditoriumID);
+      if (!aud) return res.status(404).json({ error: "Auditorium not found in theatre" });
+
+      // prevent double-booking same auditorium/time
+      const conflict = await Showtime.findOne({
+        theatre: theatre._id,
+        auditoriumID,
+        startTime: new Date(startTime)
+      });
+      if (conflict) return res.status(400).json({ error: "This auditorium is already booked at that time." });
+
+      const seats = (aud.seats || []).map(s => ({ row: s.rowLabel, number: s.seatNumber, status: "available" }));
+      if (seats.length === 0) return res.status(400).json({ error: "No seats defined for this auditorium" });
+
+      const showtime = new Showtime({
+        movie: movie._id,
+        movieTitle: movie.title,
+        theatre: theatre._id,
+        showroom: showroom || aud.audName || auditoriumID,
+        auditoriumID,
+        startTime: new Date(startTime),
+        layoutVersion: aud.layoutVersion || 1,
+        layoutChecksum: require("crypto").createHash("sha1").update(JSON.stringify(aud.seats || [])).digest("hex"),
+        seats
+      });
+
+      await showtime.save();
+      return res.status(201).json(showtime);
+    }
+    
+    // Legacy format - just movieID, showroom, startTime
+    console.log('Using legacy format');
+    
     const movie = await Movie.findById(movieId);
     if (!movie) return res.status(404).json({ error: "Movie not found" });
 
-    const theatre = await Theatre.findById(theatreId).lean();
-    if (!theatre) return res.status(404).json({ error: "Theatre not found" });
-
-    const aud = (theatre.auditoriums || []).find(a => a.auditoriumID === auditoriumID);
-    if (!aud) return res.status(404).json({ error: "Auditorium not found in theatre" });
-
-    // prevent double-booking same auditorium/time
-    const conflict = await Showtime.findOne({
-      theatre: theatre._id,
-      auditoriumID,
-      startTime: new Date(startTime)
+    const showtimeDate = new Date(startTime);
+    
+    // Check for conflicts in same showroom at same time
+    const conflict = await Showtime.findOne({ 
+      showroom, 
+      startTime: showtimeDate 
     });
-    if (conflict) return res.status(400).json({ error: "This auditorium is already booked at that time." });
-
-    const seats = (aud.seats || []).map(s => ({ row: s.rowLabel, number: s.seatNumber, status: "available" }));
-    if (seats.length === 0) return res.status(400).json({ error: "No seats defined for this auditorium" });
+    
+    if (conflict) {
+      return res.status(400).json({ error: "There is already a showtime in this showroom at this time." });
+    }
 
     const showtime = new Showtime({
-      movie: movie._id,
+      movie: movieId,
       movieTitle: movie.title,
-      theatre: theatre._id,
-      showroom: showroom || aud.audName || auditoriumID,
-      auditoriumID,
-      startTime: new Date(startTime),
-      layoutVersion: aud.layoutVersion || 1,
-      layoutChecksum: checksum(JSON.stringify(aud.seats || [])),
-      seats
+      theatre: null, // No theatre for legacy format
+      showroom,
+      auditoriumID: auditoriumID || showroom, // Use showroom as auditoriumID if not provided
+      startTime: showtimeDate,
+      layoutVersion: req.body.layoutVersion || 1,
+      layoutChecksum: req.body.layoutChecksum || "",
+      seats: [] // Empty for now, can be populated later
     });
 
     await showtime.save();
     res.status(201).json(showtime);
+    
   } catch (err) {
+    console.error('Error creating showtime:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -25,7 +25,7 @@ const ShowtimeSchema = new mongoose.Schema(
     movieTitle: { type: String, required: true }, // denormalized for UI
 
     // where it plays
-    theatre: { type: mongoose.Schema.Types.ObjectId, ref: "Theatre", required: true },
+    theatre: { type: mongoose.Schema.Types.ObjectId, ref: "Theatre", required: false },
     showroom: { type: String, required: true },        // "Auditorium 1"
     auditoriumID: { type: String, required: true },    // "Aud1"
 
@@ -44,7 +44,10 @@ const ShowtimeSchema = new mongoose.Schema(
 
 // Helpful compound indexes
 ShowtimeSchema.index({ movie: 1, startTime: 1 });
-ShowtimeSchema.index({ theatre: 1, auditoriumID: 1, startTime: 1 }, { unique: true });
+// Index for new format with theatre
+ShowtimeSchema.index({ theatre: 1, auditoriumID: 1, startTime: 1 }, { unique: true, sparse: true });
+// Index for legacy format without theatre
+ShowtimeSchema.index({ showroom: 1, startTime: 1 }, { unique: true, partialFilterExpression: { theatre: null } });
 
 // ------- Utilities & helpers
 
