@@ -668,9 +668,51 @@ app.delete("/api/showtime/:id/hold/:holdId", auth, async (req, res) => {
 app.post("/api/showtime/:id/purchase", auth, async (req, res) => {
   const session = await mongoose.startSession();
   try {
-    const { holdId, seats, total = 0, paymentLast4 = "" } = req.body || {};
-    if (!holdId || !Array.isArray(seats) || seats.length === 0)
+    const {
+      holdId,
+      seats,
+      total = 0,
+      paymentLast4 = "",
+      ticketCount,
+      ageCategories,
+    } = req.body || {};
+
+    if (!holdId || !Array.isArray(seats) || seats.length === 0) {
       return res.status(400).json({ error: "holdId and seats[] required" });
+    }
+
+    // --- ticket count + age categories validation ---
+    if (ticketCount == null) {
+      return res.status(400).json({ error: "ticketCount is required" });
+    }
+
+    const ticketNum = Number(ticketCount);
+    if (!Number.isInteger(ticketNum) || ticketNum <= 0) {
+      return res.status(400).json({ error: "ticketCount must be a positive integer" });
+    }
+
+    if (!Array.isArray(ageCategories) || ageCategories.length !== ticketNum) {
+      return res.status(400).json({
+        error: "ageCategories must be an array with one entry per ticket",
+      });
+    }
+
+    if (seats.length !== ticketNum) {
+      return res.status(400).json({
+        error: "Number of selected seats must match ticketCount",
+      });
+    }
+
+    const allowedAges = ["Adult", "Child", "Senior"]; // adjust if your team uses different labels
+    const invalidAge = ageCategories.find(
+      (a) => !allowedAges.includes(String(a))
+    );
+    if (invalidAge) {
+      return res.status(400).json({
+        error: `Invalid age category: ${invalidAge}. Allowed: ${allowedAges.join(", ")}`,
+      });
+    }
+    // --- end validation ---
 
     const showtimeId = req.params.id;
     await cleanupExpiredHolds(showtimeId);
@@ -727,6 +769,8 @@ app.post("/api/showtime/:id/purchase", auth, async (req, res) => {
           seats,
           total,
           paymentLast4,
+          ticketCount: ticketNum,
+          ageCategories,
         },
       ],
       { session }
@@ -735,7 +779,9 @@ app.post("/api/showtime/:id/purchase", auth, async (req, res) => {
     await session.commitTransaction();
     res.status(201).json({ message: "Purchased", bookingId: booking._id });
   } catch (err) {
-    try { await session.abortTransaction(); } catch {}
+    try {
+      await session.abortTransaction();
+    } catch {}
     res.status(500).json({ error: err.message });
   } finally {
     session.endSession();

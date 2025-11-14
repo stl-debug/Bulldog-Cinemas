@@ -1,3 +1,4 @@
+// src/models/Booking.js
 const mongoose = require("mongoose");
 
 const BookingSchema = new mongoose.Schema(
@@ -13,7 +14,11 @@ const BookingSchema = new mongoose.Schema(
 
     seats: [{ row: String, number: Number }],
     total: Number,
-    paymentLast4: String // safe metadata only
+    paymentLast4: String, // safe metadata only
+
+    // NEW FIELDS
+    ticketCount: { type: Number },               // how many tickets this booking is for
+    ageCategories: [{ type: String }]            // e.g. ["Adult", "Adult", "Child"]
   },
   {
     collection: "bookings",
