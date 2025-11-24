@@ -35,18 +35,50 @@ function ReviewBookingPage() {
         0
     );
 
-    const handlePurchase = () => {
-        if (!cardNumber || !expiry || !cvv) {
-            setError('Please fill in all payment fields.');
-            return;
+    const handlePurchase = async () => {
+    if (!cardNumber || !expiry || !cvv) {
+        setError('Please fill in all payment fields.');
+        return;
+    }
+
+    try {
+        const response = await fetch("/api/bookings", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${localStorage.getItem("token")}`
+            },
+            body: JSON.stringify({
+                user: user.id,
+                showtime: bookingData.showtimeId, // you may need to pass this earlier
+                movieTitle,
+                theatreName: "Bulldog Cinemas",
+                showroom: "Theater 1",
+                startTime: new Date(`${date} ${time}`),
+                seats: selectedSeats.map(seat => ({
+                    row: seat[0],
+                    number: parseInt(seat.slice(1))
+                })),
+                ticketCount: selectedSeats.length,
+                ageCategories: selectedSeats.map(seat => ticketTypes[seat]),
+                total: totalPrice,
+                paymentLast4: cardNumber.slice(-4)
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || "Booking failed");
         }
 
-        console.log('Purchasing tickets:', { movieTitle, date, time, selectedSeats, ticketTypes, cardNumber, expiry, cvv });
+        setSuccess("Tickets booked successfully!");
+        setTimeout(() => navigate("/order-confirmation"), 500);
 
-        setSuccess('Tickets purchased successfully!');
-        setError('');
-        setTimeout(() => navigate('/order-confirmation'), 500);
-    };
+    } catch (err) {
+        setError(err.message);
+    }
+};
+
 
     return (
         <div className={styles.reviewContainer}>

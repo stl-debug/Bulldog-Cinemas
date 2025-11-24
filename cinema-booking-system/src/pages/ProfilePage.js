@@ -4,7 +4,7 @@ import styles from "../styles/ProfilePage.module.css";
 const API_BASE =
   process.env.REACT_APP_API_BASE ||
   process.env.NEXT_PUBLIC_API_BASE ||
-  "http://localhost:5001";
+  "";
 
 function maskLast4(last4) {
   if (!last4) return "";

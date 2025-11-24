@@ -9,9 +9,11 @@ function MovieDetails() {
     const [selectedDate, setSelectedDate] = useState('');
 
     useEffect(() => {
-        fetch(`http://localhost:5001/api/movies/${id}`)
+        fetch(`/api/movies/${id}`)
             .then(res => res.json())
             .then(data => {
+                console.log("Fetched movie data:", data);
+                console.log("Showtimes:", data.showtimes);
                 setMovie(data);
                 setLoading(false);
             })
@@ -71,15 +73,18 @@ function MovieDetails() {
                                     {(movie.showtimes?.length
                                         ? movie.showtimes
                                         : [{ time: '2:00 PM' }, { time: '5:00 PM' }, { time: '8:00 PM' }]
-                                    ).map((show, i) => (
+                                    ).map((show, i) => {
+                                        console.log(`Showtime ${i}:`, show, "Has _id?", !!show._id);
+                                        return (
                                         <Link
                                             key={i}
-                                            to={`/booking/${movie._id}/${encodeURIComponent(show.time || show)}?date=${selectedDate}`}
+                                            to={`/booking/${movie._id}/${show._id}?date=${selectedDate}`}
                                             className={styles.showtimeButton}
                                         >
                                             {show.time || show}
                                         </Link>
-                                    ))}
+                                    );
+                                    })}
                                 </div>
                             </>
                         )}

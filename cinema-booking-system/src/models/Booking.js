@@ -25,5 +25,10 @@ const BookingSchema = new mongoose.Schema(
     timestamps: true // adds createdAt, updatedAt
   }
 );
+BookingSchema.index(
+  { showtime: 1, "seats.row": 1, "seats.number": 1 },
+  { unique: true }
+);
+
 
 module.exports = mongoose.model("Booking", BookingSchema);

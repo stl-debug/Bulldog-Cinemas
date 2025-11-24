@@ -1,4 +1,5 @@
 // server.js
+console.log("🔧 Server.js is being loaded - FRESH START");
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -10,6 +11,7 @@ require("dotenv").config();
 const Movie = require("./src/models/Movie");
 const User = require("./src/models/User");
 const Showtime = require("./src/models/Showtime");
+const Booking = require("./src/models/Booking");
 const Promotion = require("./src/models/Promotion");
 const { encryptText } = require("./src/utils/crypto"); 
 
@@ -106,27 +108,30 @@ app.get("/api/movies", async (_req, res) => {
           // Handle both old format (date field) and new format (startTime field)
           const timeValue = s.startTime || s.date;
           
+          const showObj = {
+            _id: s._id.toString(), // Explicitly convert ObjectId to string
+          };
+          
           if (!timeValue) {
-            return {
-              time: 'No Time Set',
-              showroom: s.showroom,
-              capacity: s.capacity || 100,
-              bookedSeats: s.bookedSeats || 0
-            };
+            showObj.time = 'No Time Set';
+            showObj.showroom = s.showroom;
+            showObj.capacity = s.capacity || 100;
+            showObj.bookedSeats = s.bookedSeats || 0;
+            return showObj;
           }
           
           const timeDate = new Date(timeValue);
           
-          return {
-            time: !isNaN(timeDate.getTime()) ? timeDate.toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-              timeZone: 'America/New_York',
-            }) : 'Invalid Date',
-            showroom: s.showroom,
-            capacity: s.capacity || 100,
-            bookedSeats: s.bookedSeats || 0
-          };
+          showObj.time = !isNaN(timeDate.getTime()) ? timeDate.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'America/New_York',
+          }) : 'Invalid Date';
+          showObj.showroom = s.showroom;
+          showObj.capacity = s.capacity || 100;
+          showObj.bookedSeats = s.bookedSeats || 0;
+          
+          return showObj;
         });
 
         return movie;
@@ -145,6 +150,7 @@ app.get("/api/movies", async (_req, res) => {
 app.get("/api/movies/:id", async (req, res) => {
   try {
     const movieID = req.params.id;
+    console.log("GET /api/movies/:id - Received ID:", movieID);
 
     // Fetch the movie
     const movie = await Movie.findById(movieID).lean();
@@ -152,37 +158,42 @@ app.get("/api/movies/:id", async (req, res) => {
 
     // Fetch showtimes from DB (use 'new' with ObjectId)
     const showtimes = await Showtime.find({ movie: new mongoose.Types.ObjectId(movieID) }).lean();
+    console.log(`Found ${showtimes.length} showtimes for movie ${movieID}`);
 
     // Map to desired format
     const liveShowtimes = showtimes.map(s => {
       // Handle both old format (date field) and new format (startTime field)  
       const timeValue = s.startTime || s.date;
       
+      const showObj = {
+        _id: s._id.toString(), // Explicitly convert ObjectId to string
+      };
+      
       if (!timeValue) {
-        return {
-          time: 'No Time Set',
-          showroom: s.showroom,
-          capacity: s.capacity || 100,
-          bookedSeats: s.bookedSeats || 0
-        };
+        showObj.time = 'No Time Set';
+        showObj.showroom = s.showroom;
+        showObj.capacity = s.capacity || 100;
+        showObj.bookedSeats = s.bookedSeats || 0;
+        return showObj;
       }
       
       const timeDate = new Date(timeValue);
       
-      return {
-        time: !isNaN(timeDate.getTime()) ? timeDate.toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'America/New_York',
-        }) : 'Invalid Date',
-        showroom: s.showroom,
-        capacity: s.capacity || 100,
-        bookedSeats: s.bookedSeats || 0
-      };
+      showObj.time = !isNaN(timeDate.getTime()) ? timeDate.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'America/New_York',
+      }) : 'Invalid Date';
+      showObj.showroom = s.showroom;
+      showObj.capacity = s.capacity || 100;
+      showObj.bookedSeats = s.bookedSeats || 0;
+      
+      return showObj;
     });
 
     // Overwrite embedded showtimes
     movie.showtimes = liveShowtimes;
+    console.log("Returning movie with showtimes:", movie.showtimes);
 
     res.json(movie);
 
@@ -253,14 +264,121 @@ app.get("/api/movies/:movieId/showtimes", async (req, res) => {
 // Booking page needs the seat map
 app.get("/api/showtime/:showtimeId", async (req, res) => {
   try {
-    const s = await Showtime.findById(req.params.showtimeId).lean();
-    if (!s) return res.status(404).json({ error: "Showtime not found" });
-    res.json({
-      _id: s._id, movie: s.movie, movieTitle: s.movieTitle,
-      theatre: s.theatre, showroom: s.showroom, auditoriumID: s.auditoriumID,
-      startTime: s.startTime, seats: s.seats
+    const { showtimeId } = req.params;
+    console.log("GET /api/showtime/:showtimeId - Received ID:", showtimeId);
+    
+    if (!showtimeId || showtimeId === "undefined") {
+      console.log("Invalid showtimeId - returning 400");
+      return res.status(400).json({ error: "Invalid showtimeId" });
+    }
+    
+    // Validate if it's a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(showtimeId)) {
+      console.log("Invalid ObjectId format - returning 400");
+      return res.status(400).json({ error: "Invalid showtimeId format" });
+    }
+    
+    console.log("Fetching showtime from DB...");
+    const s = await Showtime.findById(showtimeId).lean();
+    console.log("Fetched showtime:", JSON.stringify(s, null, 2));
+    
+    if (!s) {
+      console.log("Showtime not found - returning 404");
+      return res.status(404).json({ error: "Showtime not found" });
+    }
+    
+    console.log("Building response object...");
+    const response = {
+      _id: s._id ? s._id.toString() : 'NO_ID',
+      movie: s.movie ? s.movie.toString() : null,
+      movieTitle: s.movieTitle || 'Unknown',
+      theatre: s.theatre ? s.theatre.toString() : null,
+      showroom: s.showroom || 'Unknown',
+      auditoriumID: s.auditoriumID || 'Unknown',
+      startTime: s.startTime || s.date,
+      seats: s.seats || [],
+      date: s.date,
+    };
+    console.log("Returning response:", JSON.stringify(response, null, 2));
+    res.json(response);
+  } catch (err) {
+    console.error("Error in GET /api/showtime/:showtimeId - Full error:", err);
+    console.error("Stack trace:", err.stack);
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// POST /api/bookings - Create a new booking
+app.post("/api/bookings", async (req, res) => {
+  try {
+    const { user, showtime, seats, movieTitle, ticketCount, ageCategories } = req.body;
+    console.log("POST /api/bookings - Creating booking with:", { user, showtime, seats, movieTitle, ticketCount, ageCategories });
+
+    // Validate required fields
+    if (!user || !showtime || !seats || !Array.isArray(seats) || seats.length === 0) {
+      return res.status(400).json({ error: "Missing required fields: user, showtime, seats" });
+    }
+
+    // Get the showtime to access theatre info
+    const showtimeData = await Showtime.findById(showtime);
+    if (!showtimeData) {
+      return res.status(404).json({ error: "Showtime not found" });
+    }
+
+    // Create the booking
+    const booking = new Booking({
+      user,
+      showtime,
+      movieTitle: movieTitle || showtimeData.movieTitle,
+      theatreName: showtimeData.theatre,
+      showroom: showtimeData.showroom,
+      startTime: showtimeData.startTime || showtimeData.date,
+      seats,
+      ticketCount,
+      ageCategories
     });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+
+    await booking.save();
+    console.log("Booking created successfully:", booking._id);
+
+    // Mark seats as sold in the showtime
+    const updatedShowtime = await Showtime.findByIdAndUpdate(
+      showtime,
+      {
+        $set: {
+          seats: showtimeData.seats.map(seat => {
+            const isBooked = seats.some(s => s.row === seat.row && s.number === seat.number);
+            return isBooked ? { ...seat, status: "sold" } : seat;
+          })
+        }
+      },
+      { new: true }
+    );
+
+    console.log("Showtime seats updated:", updatedShowtime._id);
+
+    res.status(201).json({
+      success: true,
+      bookingId: booking._id,
+      message: "Booking created successfully",
+      booking
+    });
+  } catch (err) {
+    console.error("Error creating booking:", err);
+    
+    // Handle E11000 duplicate key error
+    if (err.code === 11000) {
+      return res.status(409).json({ error: "One or more seats are already booked. Please select different seats." });
+    }
+    
+    res.status(500).json({ error: "Failed to create booking. Please try again." });
+  }
+});
+
+// DEBUG: Log all incoming requests
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
 });
 
 // Auth
