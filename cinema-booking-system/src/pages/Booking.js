@@ -9,6 +9,7 @@ function BookingPage() {
   const { movieId, showtimeId } = useParams();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
+  const bookingDate = searchParams.get('date'); // Extract date from query string
   const navigate = useNavigate();
 
   const [movieTitle, setMovieTitle] = useState('');
@@ -21,6 +22,7 @@ function BookingPage() {
   console.log("=== BookingPage Loaded ===");
   console.log("movieId:", movieId);
   console.log("showtimeId:", showtimeId);
+  console.log("bookingDate from query:", bookingDate);
   console.log("location.pathname:", location.pathname);
   console.log("Full URL:", window.location.href);
 
@@ -104,13 +106,27 @@ function BookingPage() {
 
   let formattedDate = '';
   let formattedTime = '';
-  if (showtime && showtime.startTime) {
+  
+  // Use the booking date from query string if available, otherwise use showtime startTime
+  if (bookingDate) {
+    // Parse the date from query string (format: YYYY-MM-DD)
+    const dt = new Date(bookingDate + 'T00:00:00');
+    formattedDate = dt.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } else if (showtime && showtime.startTime) {
     const dt = new Date(showtime.startTime);
     formattedDate = dt.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
+  }
+  
+  if (showtime && showtime.startTime) {
+    const dt = new Date(showtime.startTime);
     formattedTime = dt.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',

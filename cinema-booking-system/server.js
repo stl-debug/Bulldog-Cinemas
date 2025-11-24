@@ -319,10 +319,29 @@ app.post("/api/bookings", async (req, res) => {
       return res.status(400).json({ error: "Missing required fields: user, showtime, seats" });
     }
 
-    // Get the showtime to access theatre info
+    // Get the showtime to access theatre info and current seat statuses
     const showtimeData = await Showtime.findById(showtime);
     if (!showtimeData) {
       return res.status(404).json({ error: "Showtime not found" });
+    }
+
+    // CHECK: Validate that the user hasn't already booked these seats for this showtime
+    const existingBookings = await Booking.find({
+      showtime: showtime,
+      seats: { $elemMatch: { $or: seats } }
+    });
+
+    if (existingBookings.length > 0) {
+      const bookedSeats = [];
+      for (const booking of existingBookings) {
+        for (const seat of booking.seats) {
+          if (seats.some(s => s.row === seat.row && s.number === seat.number)) {
+            bookedSeats.push(`${seat.row}${seat.number}`);
+          }
+        }
+      }
+      console.log("Already booked seats:", bookedSeats);
+      return res.status(409).json({ error: `Seat(s) ${bookedSeats.join(", ")} are already booked for this showtime. Please select different seats.` });
     }
 
     // Create the booking
@@ -342,20 +361,37 @@ app.post("/api/bookings", async (req, res) => {
     console.log("Booking created successfully:", booking._id);
 
     // Mark seats as sold in the showtime
+    console.log("BEFORE UPDATE - Seats to mark as sold:", seats);
+    const updatedSeats = showtimeData.seats.map(seat => {
+      const isBooked = seats.some(s => s.row === seat.row && s.number === seat.number);
+      if (isBooked) {
+        console.log(`Marking ${seat.row}${seat.number} as sold (was ${seat.status})`);
+        // Return a properly structured seat object
+        return {
+          row: seat.row,
+          number: seat.number,
+          status: "sold",
+          heldBy: seat.heldBy || null,
+          heldUntil: seat.heldUntil || null
+        };
+      }
+      return {
+        row: seat.row,
+        number: seat.number,
+        status: seat.status,
+        heldBy: seat.heldBy || null,
+        heldUntil: seat.heldUntil || null
+      };
+    });
+
+    console.log("Updating showtime with new seats...");
     const updatedShowtime = await Showtime.findByIdAndUpdate(
       showtime,
-      {
-        $set: {
-          seats: showtimeData.seats.map(seat => {
-            const isBooked = seats.some(s => s.row === seat.row && s.number === seat.number);
-            return isBooked ? { ...seat, status: "sold" } : seat;
-          })
-        }
-      },
+      { seats: updatedSeats },
       { new: true }
     );
 
-    console.log("Showtime seats updated:", updatedShowtime._id);
+    console.log("AFTER UPDATE - Seat statuses:", updatedShowtime.seats.map(s => `${s.row}${s.number}:${s.status}`));
 
     res.status(201).json({
       success: true,
@@ -365,12 +401,6 @@ app.post("/api/bookings", async (req, res) => {
     });
   } catch (err) {
     console.error("Error creating booking:", err);
-    
-    // Handle E11000 duplicate key error
-    if (err.code === 11000) {
-      return res.status(409).json({ error: "One or more seats are already booked. Please select different seats." });
-    }
-    
     res.status(500).json({ error: "Failed to create booking. Please try again." });
   }
 });
