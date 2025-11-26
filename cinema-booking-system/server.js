@@ -919,14 +919,13 @@ app.post("/api/showtimes", async (req, res) => {
     const showtime = new Showtime({
       movie: movieId,
       movieTitle: movie.title,
-      theatre: null, // No theatre for legacy format
+      theatre: null,
       showroom,
-      auditoriumID: auditoriumID || showroom, // Use showroom as auditoriumID if not provided
+      auditoriumID: auditoriumID || showroom, 
       startTime: showtimeDate,
-      // Don't set date field - it's not in the schema and causes duplicate key errors
       layoutVersion: req.body.layoutVersion || 1,
       layoutChecksum: req.body.layoutChecksum || "",
-      seats: [] // Empty for now, can be populated later
+      seats: []
     });
 
     await showtime.save();
