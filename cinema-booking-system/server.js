@@ -1,5 +1,4 @@
 // server.js
-console.log("🔧 Server.js is being loaded - FRESH START");
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -99,47 +98,8 @@ mongoose
 app.get("/api/movies", async (_req, res) => {
   try {
     const movies = await Movie.find({}).lean();
-
-    const moviesWithShowtimes = await Promise.all(
-      movies.map(async (movie) => {
-        const showtimes = await Showtime.find({ movie: movie._id }).lean();
-
-        movie.showtimes = showtimes.map(s => {
-          // Handle both old format (date field) and new format (startTime field)
-          const timeValue = s.startTime || s.date;
-          
-          const showObj = {
-            _id: s._id.toString(), // Explicitly convert ObjectId to string
-          };
-          
-          if (!timeValue) {
-            showObj.time = 'No Time Set';
-            showObj.showroom = s.showroom;
-            showObj.capacity = s.capacity || 100;
-            showObj.bookedSeats = s.bookedSeats || 0;
-            return showObj;
-          }
-          
-          const timeDate = new Date(timeValue);
-          
-          showObj.time = !isNaN(timeDate.getTime()) ? timeDate.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZone: 'America/New_York',
-          }) : 'Invalid Date';
-          showObj.showroom = s.showroom;
-          showObj.capacity = s.capacity || 100;
-          showObj.bookedSeats = s.bookedSeats || 0;
-          
-          return showObj;
-        });
-
-        return movie;
-      })
-    );
-
-    res.json(moviesWithShowtimes);
-
+    // Don't embed showtimes here - let frontend fetch from /api/showtimes
+    res.json(movies);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -156,8 +116,10 @@ app.get("/api/movies/:id", async (req, res) => {
     const movie = await Movie.findById(movieID).lean();
     if (!movie) return res.status(404).json({ message: "Movie not found" });
 
-    // Fetch showtimes from DB (use 'new' with ObjectId)
-    const showtimes = await Showtime.find({ movie: new mongoose.Types.ObjectId(movieID) }).lean();
+    // Fetch showtimes from DB (use 'new' with ObjectId) - sorted by startTime
+    const showtimes = await Showtime.find({ movie: new mongoose.Types.ObjectId(movieID) })
+      .sort({ startTime: 1 })
+      .lean();
     console.log(`Found ${showtimes.length} showtimes for movie ${movieID}`);
 
     // Map to desired format
@@ -243,6 +205,21 @@ app.get("/api/movies/:movieId/show-dates", async (req, res) => {
 });
 
 // Showtimes for a specific date (movie page → time buttons)
+// Get all showtimes for a movie
+app.get("/api/showtimes/:movieId", async (req, res) => {
+  try {
+    const { movieId } = req.params;
+    const shows = await Showtime.find(
+      { movie: movieId },
+      { movie: 1, movieTitle: 1, theatre: 1, showroom: 1, auditoriumID: 1, startTime: 1, _id: 1 }
+    ).sort({ startTime: 1 }).lean();
+
+    res.json(shows);
+  } catch (err) { 
+    res.status(500).json({ error: err.message }); 
+  }
+});
+
 app.get("/api/movies/:movieId/showtimes", async (req, res) => {
   try {
     const { movieId } = req.params;

@@ -6,10 +6,7 @@ import { UserContext } from '../context/UserContext';
 
 function BookingPage() {
   const { user } = useContext(UserContext);
-  const { movieId, showtimeId } = useParams();
-  const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
-  const bookingDate = searchParams.get('date'); // Extract date from query string
+  const { showtimeId } = useParams();
   const navigate = useNavigate();
 
   const [movieTitle, setMovieTitle] = useState('');
@@ -20,10 +17,7 @@ function BookingPage() {
   
   // DEBUG: Log params on mount
   console.log("=== BookingPage Loaded ===");
-  console.log("movieId:", movieId);
   console.log("showtimeId:", showtimeId);
-  console.log("bookingDate from query:", bookingDate);
-  console.log("location.pathname:", location.pathname);
   console.log("Full URL:", window.location.href);
 
   const rows = ["A", "B", "C", "D"];
@@ -32,19 +26,11 @@ function BookingPage() {
   // Redirect if not logged in
   useEffect(() => {
     if (!user) {
-      navigate(`/login?redirect=/booking/${movieId}/${showtimeId}`);
+      navigate(`/login?redirect=/booking/${showtimeId}`);
     }
-  }, [user, navigate, movieId, showtimeId]);
+  }, [user, navigate, showtimeId]);
 
-  // Load movie title
-  useEffect(() => {
-    fetch(`/api/movies/${movieId}`)
-      .then(res => res.json())
-      .then(data => setMovieTitle(data.title))
-      .catch(err => console.error(err));
-  }, [movieId]);
-
-  // Load showtime details
+  // Load showtime details (which includes movie info)
   useEffect(() => {
     console.log("BookingPage useEffect - showtimeId:", showtimeId);
     if (!showtimeId) {
@@ -56,7 +42,6 @@ function BookingPage() {
     fetch(url)
       .then(async res => {
         console.log("Showtime fetch response status:", res.status, res.statusText);
-        console.log("Response headers Content-Type:", res.headers.get('content-type'));
         const contentType = res.headers.get('content-type');
         if (!res.ok) {
           const text = await res.text();
@@ -65,7 +50,7 @@ function BookingPage() {
         }
         if (!contentType || !contentType.includes('application/json')) {
           const text = await res.text();
-          console.error("Response is not JSON! Content-Type:", contentType, "Text:", text.substring(0, 500));
+          console.error("Response is not JSON! Content-Type:", contentType);
           throw new Error(`Response is not JSON. Content-Type: ${contentType}`);
         }
         const data = await res.json();
@@ -78,13 +63,12 @@ function BookingPage() {
           setShowtime(null);
         } else {
           setShowtime(data);
-          setError('');
+          setMovieTitle(data.movieTitle || 'Unknown Movie');
         }
       })
       .catch(err => {
         console.error("Error loading showtime:", err);
-        setError('Could not load showtime: ' + err.message);
-        setShowtime(null);
+        setError(`Error loading showtime: ${err.message}`);
       });
   }, [showtimeId]);
 
@@ -107,26 +91,14 @@ function BookingPage() {
   let formattedDate = '';
   let formattedTime = '';
   
-  // Use the booking date from query string if available, otherwise use showtime startTime
-  if (bookingDate) {
-    // Parse the date from query string (format: YYYY-MM-DD)
-    const dt = new Date(bookingDate + 'T00:00:00');
-    formattedDate = dt.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  } else if (showtime && showtime.startTime) {
-    const dt = new Date(showtime.startTime);
-    formattedDate = dt.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  }
-  
+  // Format date and time from showtime
   if (showtime && showtime.startTime) {
     const dt = new Date(showtime.startTime);
+    formattedDate = dt.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
     formattedTime = dt.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
