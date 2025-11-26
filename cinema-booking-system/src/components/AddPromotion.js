@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styles from '../styles/AdminHome.module.css';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+const API_BASE = process.env.REACT_APP_API_URL || '';
 
 function AddPromotion() {
   const [saving, setSaving] = useState(false);

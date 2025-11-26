@@ -5,18 +5,32 @@ import styles from '../styles/MovieDetails.module.css';
 function MovieDetails() {
     const { id } = useParams();
     const [movie, setMovie] = useState(null);
+    const [showtimes, setShowtimes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState('');
 
     useEffect(() => {
-        fetch(`http://localhost:5001/api/movies/${id}`)
+        // Fetch movie details
+        fetch(`/api/movies/${id}`)
             .then(res => res.json())
             .then(data => {
+                console.log("Fetched movie data:", data);
                 setMovie(data);
-                setLoading(false);
             })
             .catch(err => {
                 console.error("Error fetching movie details:", err);
+            });
+
+        // Fetch all showtimes for this movie
+        fetch(`/api/showtimes/${id}`)
+            .then(res => res.json())
+            .then(data => {
+                console.log("Fetched showtimes:", data);
+                setShowtimes(data);
+                setLoading(false);
+            })
+            .catch(err => {
+                console.error("Error fetching showtimes:", err);
                 setLoading(false);
             });
     }, [id]);
@@ -64,22 +78,34 @@ function MovieDetails() {
                         <p>{movie.description}</p>
 
 
-                        {movie.status === "Currently Running" && selectedDate && (
+                        {movie && movie.status === "Currently Running" && selectedDate && (
                             <>
                                 <h4>Step 2: Choose a showtime to book</h4>
                                 <div className={styles.showtimes}>
-                                    {(movie.showtimes?.length
-                                        ? movie.showtimes
-                                        : [{ time: '2:00 PM' }, { time: '5:00 PM' }, { time: '8:00 PM' }]
-                                    ).map((show, i) => (
-                                        <Link
-                                            key={i}
-                                            to={`/booking/${movie._id}/${encodeURIComponent(show.time || show)}?date=${selectedDate}`}
-                                            className={styles.showtimeButton}
-                                        >
-                                            {show.time || show}
-                                        </Link>
-                                    ))}
+                                    {showtimes
+                                        .filter(show => {
+                                            // Filter showtimes to only match the selected date
+                                            const showDate = new Date(show.startTime);
+                                            const showDateStr = showDate.toISOString().split('T')[0];
+                                            return showDateStr === selectedDate;
+                                        })
+                                        .map((show) => {
+                                            const showTime = new Date(show.startTime).toLocaleTimeString('en-US', { 
+                                                hour: '2-digit', 
+                                                minute: '2-digit',
+                                                hour12: true 
+                                            });
+                                            console.log(`Showtime ID: ${show._id}, Time: ${showTime}`);
+                                            return (
+                                            <Link
+                                                key={show._id}
+                                                to={`/booking/${show._id}`}
+                                                className={styles.showtimeButton}
+                                            >
+                                                {showTime}
+                                            </Link>
+                                        );
+                                        })}
                                 </div>
                             </>
                         )}

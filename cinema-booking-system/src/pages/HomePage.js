@@ -18,7 +18,7 @@ function HomePage() {
     const [movies, setMovies] = useState([]);
 
     useEffect(() => {
-        fetch('http://localhost:5001/api/movies')
+        fetch('/api/movies')
             .then(res => res.json())
             .then(data => setMovies(data))
             .catch(err => console.error(err));

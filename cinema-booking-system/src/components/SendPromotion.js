@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from '../styles/AdminHome.module.css';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+const API_BASE = process.env.REACT_APP_API_URL || '';
 
 function SendPromotion() {
   const [promotions, setPromotions] = useState([]);
@@ -120,12 +120,12 @@ function SendPromotion() {
                 if (!promo) return null;
                 return (
                   <div>
-                    <h3 style={{ marginTop: 0 }}>Promotion Details:</h3>
-                    <p><strong>Code:</strong> {promo._id}</p>
-                    <p><strong>Description:</strong> {promo.description}</p>
-                    <p><strong>Discount:</strong> {getDiscountText(promo)}</p>
-                    <p><strong>Valid From:</strong> {formatDate(promo.validFrom)}</p>
-                    <p><strong>Valid To:</strong> {formatDate(promo.validTo)}</p>
+                    <h3 style={{ marginTop: 0, color: '#333' }}>Promotion Details:</h3>
+                    <p style={{ color: '#333', margin: '0.5rem 0' }}><strong>Code:</strong> {promo._id}</p>
+                    <p style={{ color: '#333', margin: '0.5rem 0' }}><strong>Description:</strong> {promo.description}</p>
+                    <p style={{ color: '#333', margin: '0.5rem 0' }}><strong>Discount:</strong> {getDiscountText(promo)}</p>
+                    <p style={{ color: '#333', margin: '0.5rem 0' }}><strong>Valid From:</strong> {formatDate(promo.validFrom)}</p>
+                    <p style={{ color: '#333', margin: '0.5rem 0' }}><strong>Valid To:</strong> {formatDate(promo.validTo)}</p>
                   </div>
                 );
               })()}

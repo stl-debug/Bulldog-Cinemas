@@ -11,7 +11,7 @@ function MovieList() {
 
     // Fetch movies from backend when component mounts
     useEffect(() => {
-        fetch("http://localhost:5001/api/movies")
+        fetch("/api/movies")
             .then(res => res.json())
             .then(data => setMovies(data))
             .catch(err => console.error("Error fetching movies:", err));

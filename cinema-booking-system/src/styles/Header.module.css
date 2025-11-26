@@ -25,43 +25,49 @@
 .navbar {
     display: flex;
     align-items: center;
-    gap: 15px;
+    justify-content: space-between;
     background-color: #a30000;
+    padding: 10px 16px;
+    border-radius: 6px;
+}
+
+.menuLeft,
+.menuRight {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .navLink {
     color: white;
     text-decoration: none;
     font-weight: bold;
-    padding: 5px 10px;
-    border: 2px solid #a30000; 
+    padding: 6px 10px;
     border-radius: 6px;
-    transition: all 0.3s;
+    transition: color 0.2s ease;
 }
 
 .navLink:hover {
-    background-color: #a30000; 
     color: #ffd700;
 }
 
 .welcome {
-    margin-right: 10px;
+    margin-left: 8px;
     font-style: italic;
     color: #ddd;
+    white-space: nowrap;
 }
 
 .logoutButton {
-    background-color: #a30000;
+    background-color: #8b0000;
     color: white;
-    border: none;
-    padding: 8px 15px;
-    border-radius: 8px;
+    border: 1px solid #cc0000;
+    padding: 8px 14px;
+    border-radius: 6px;
     cursor: pointer;
     font-weight: bold;
-   
 }
 
 .logoutButton:hover {
-    background-color: #ff0000;
-  
+    background-color: #cc0000;
 }

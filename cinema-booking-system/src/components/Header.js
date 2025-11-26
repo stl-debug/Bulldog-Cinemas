@@ -18,24 +18,29 @@ function Header() {
       <div className={styles.headerContent}>
         <div className={styles.logo}>BULLDOG CINEMAS</div>
         <nav className={styles.navbar}>
-          {user?.role !== 'admin' && (
-            <>
-              <Link to="/" className={styles.navLink}>Home</Link>
-              <Link to="/search" className={styles.navLink}>Search Movies</Link>
-            </>
-          )}
-
-          {user ? (
-            <>
+          <div className={styles.menuLeft}>
+            {user?.role !== 'admin' && (
+              <>
+                <Link to="/" className={styles.navLink}>Home</Link>
+                <Link to="/search" className={styles.navLink}>Search Movies</Link>
+              </>
+            )}
+            {user && (
               <Link to="/profile" className={styles.navLink}>Profile</Link>
-              <span onClick={handleLogout} className={styles.navLink} style={{ cursor: 'pointer' }}> Logout </span>
-              <span className={styles.welcome}>
-                Welcome, {user.firstName || user.email}
-              </span>
-            </>
-          ) : (
-            <Link to="/login" className={styles.navLink}>Login</Link>
-          )}
+            )}
+          </div>
+          <div className={styles.menuRight}>
+            {user ? (
+              <>
+                <span onClick={handleLogout} className={styles.navLink} style={{ cursor: 'pointer' }}>Logout</span>
+                <span className={styles.welcome}>
+                  Welcome, {(user.firstName && user.lastName) ? `${user.firstName} ${user.lastName}` : (user.firstName || user.email)}
+                </span>
+              </>
+            ) : (
+              <Link to="/login" className={styles.navLink}>Login</Link>
+            )}
+          </div>
         </nav>
       </div>
     </header>

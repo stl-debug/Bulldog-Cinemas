@@ -5,7 +5,7 @@ import styles from '../styles/RegistrationPage.module.css';
 const API_BASE =
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
   (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_URL) ||
-  'http://localhost:5001';
+  '';
 
 export default function RegistrationPage() {
   const navigate = useNavigate();

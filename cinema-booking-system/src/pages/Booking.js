@@ -3,133 +3,233 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import styles from '../styles/Booking.module.css';
 import { UserContext } from '../context/UserContext';
 
+
 function BookingPage() {
-    const { user } = useContext(UserContext);
-    const { movieId, time } = useParams();
-    const location = useLocation();
-    const searchParams = new URLSearchParams(location.search);
-    const date = searchParams.get("date");
-    const navigate = useNavigate();
+  const { user } = useContext(UserContext);
+  const { showtimeId } = useParams();
+  const navigate = useNavigate();
 
-    const [movieTitle, setMovieTitle] = useState('');
-    const rows = ["A", "B", "C", "D"];
-    const seatsPerRow = 8;
-    const [selectedSeats, setSelectedSeats] = useState([]);
-    const [ticketTypes, setTicketTypes] = useState({}); 
-    const [error, setError] = useState('');
+  const [movieTitle, setMovieTitle] = useState('');
+  const [selectedSeats, setSelectedSeats] = useState([]);
+  const [ticketTypes, setTicketTypes] = useState({});
+  const [error, setError] = useState('');
+  const [showtime, setShowtime] = useState(null);
+  
+  // DEBUG: Log params on mount
+  console.log("=== BookingPage Loaded ===");
+  console.log("showtimeId:", showtimeId);
+  console.log("Full URL:", window.location.href);
 
+  const rows = ["A", "B", "C", "D"];
+  const seatsPerRow = 8;
 
-    useEffect(() => {
-        fetch(`http://localhost:5001/api/movies/${movieId}`)
-            .then(res => res.json())
-            .then(data => setMovieTitle(data.title))
-            .catch(err => console.error(err));
-    }, [movieId]);
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!user) {
+      navigate(`/login?redirect=/booking/${showtimeId}`);
+    }
+  }, [user, navigate, showtimeId]);
 
-    // Redirect to login if not logged in
-    useEffect(() => {
-        if (!user) {
-            navigate(`/login?redirect=/booking/${movieId}/${time}?date=${date}`);
+  // Load showtime details (which includes movie info)
+  useEffect(() => {
+    console.log("BookingPage useEffect - showtimeId:", showtimeId);
+    if (!showtimeId) {
+      console.log("No showtimeId provided");
+      return;
+    }
+    const url = `/api/showtimes/by-id/${showtimeId}`;
+    console.log("Fetching showtime from:", url);
+    fetch(url)
+      .then(async res => {
+        console.log("Showtime fetch response status:", res.status, res.statusText);
+        const contentType = res.headers.get('content-type');
+        if (!res.ok) {
+          const text = await res.text();
+          console.error("Error response text:", text.substring(0, 500));
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         }
-    }, [user, navigate, movieId, time, date]);
-
-
-    const handleSeatClick = (seatId) => {
-        if (selectedSeats.includes(seatId)) {
-            setSelectedSeats(selectedSeats.filter(seat => seat !== seatId));
-            const newTicketTypes = { ...ticketTypes };
-            delete newTicketTypes[seatId];
-            setTicketTypes(newTicketTypes);
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await res.text();
+          console.error("Response is not JSON! Content-Type:", contentType);
+          throw new Error(`Response is not JSON. Content-Type: ${contentType}`);
+        }
+        const data = await res.json();
+        console.log("Showtime data parsed successfully:", data);
+        return data;
+      })
+      .then(data => {
+        if (!data || !data._id) {
+          setError('Showtime not found or invalid data returned.');
+          setShowtime(null);
         } else {
-            setSelectedSeats([...selectedSeats, seatId]);
+          setShowtime(data);
+          setMovieTitle(data.movieTitle || 'Unknown Movie');
         }
-    };
+      })
+      .catch(err => {
+        console.error("Error loading showtime:", err);
+        setError(`Error loading showtime: ${err.message}`);
+      });
+  }, [showtimeId]);
 
-    const handleTicketTypeChange = (seatId, type) => {
-        setTicketTypes({ ...ticketTypes, [seatId]: type });
-    };
+  const handleSeatClick = (seatId) => {
+    if (selectedSeats.includes(seatId)) {
+      setSelectedSeats(selectedSeats.filter(seat => seat !== seatId));
+      const updated = { ...ticketTypes };
+      delete updated[seatId];
+      setTicketTypes(updated);
+    } else {
+      setSelectedSeats([...selectedSeats, seatId]);
+    }
+  };
 
-    const formattedDate = date
-        ? new Date(date + 'T00:00').toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        })
-        : '';
+  const handleTicketTypeChange = (seatId, type) => {
+    setTicketTypes({ ...ticketTypes, [seatId]: type });
+  };
 
-    const handleContinueBooking = () => {
-        if (selectedSeats.length === 0) {
-            setError('Please select at least one seat.');
-            return;
+
+  let formattedDate = '';
+  let formattedTime = '';
+  
+  // Format date and time from showtime
+  if (showtime && showtime.startTime) {
+    const dt = new Date(showtime.startTime);
+    formattedDate = dt.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    formattedTime = dt.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  }
+
+  const handleContinueBooking = () => {
+    if (!showtimeId) {
+      setError("Cannot book — showtime not loaded.");
+      return;
+    }
+
+    if (selectedSeats.length === 0) {
+      setError('Please select at least one seat.');
+      return;
+    }
+
+    if (!selectedSeats.every(seat => ticketTypes[seat])) {
+      setError('Please select a ticket type for all selected seats.');
+      return;
+    }
+
+    // Pre-check seat availability before navigating to payment
+    const seatsForCheck = selectedSeats.map(seat => ({
+      row: seat[0],
+      number: Number(seat.slice(1))
+    }));
+
+    fetch(`http://localhost:5001/api/showtimes/${showtimeId}/check-seats`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seats: seatsForCheck })
+    })
+      .then(async res => {
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); } catch { json = null; }
+        if (!res.ok) {
+          const msg = (json && (json.error || json.message)) || `Seat check failed (HTTP ${res.status}).`;
+          throw new Error(msg);
         }
-        if (!selectedSeats.every(seat => ticketTypes[seat])) {
-            setError('Please select a ticket type for all selected seats.');
-            return;
+        return json || { ok: false, error: 'Invalid response from server' };
+      })
+      .then(result => {
+        if (!result.ok) {
+          const msg = result.conflicts && result.conflicts.length
+            ? `Seat(s) ${result.conflicts.join(', ')} are already booked for this showtime. Please select different seats.`
+            : (result.error || 'Some seats are unavailable.');
+          setError(msg);
+          return;
         }
-        
-        setError('');
-        navigate('/review-booking', { state: { movieTitle, date: formattedDate, time, selectedSeats, ticketTypes } });
-    };
+        // Seats available — proceed to review page
+        navigate('/review-booking', {
+          state: { showtimeId, selectedSeats, ticketTypes }
+        });
+      })
+      .catch(err => {
+        setError(err.message || 'Failed to verify seat availability. Please try again.');
+        console.error('Seat check failed:', err);
+      });
+  };
 
-    return (
-        <div className={styles.bookingContainer}>
-            <h1>Booking</h1>
-            <h3>Movie: {movieTitle}</h3>
-            <h3>Date: {formattedDate}</h3>
-            <h3>Time: {time}</h3>
+  return (
+    <div className={styles.bookingContainer}>
+      <h1>Booking</h1>
+      <h3>Movie: {movieTitle}</h3>
+      <h3>Date: {formattedDate}</h3>
+      <h3>Time: {formattedTime}</h3>
 
-            <div style={{ marginTop: "30px" }}>
-                <h2 className={styles.sectionTitle}>Select Your Seats *</h2>
-                <div className={styles.screen}>Movie Screen Here</div>
-                <div className={styles.seatsGrid}>
-                    {rows.map(row =>
-                        Array.from({ length: seatsPerRow }, (_, i) => {
-                            const seatId = `${row}${i + 1}`;
-                            const isSelected = selectedSeats.includes(seatId);
-                            return (
-                                <button
-                                    key={seatId}
-                                    onClick={() => handleSeatClick(seatId)}
-                                    className={`${styles.seat} ${isSelected ? styles.selected : ''}`}
-                                >
-                                    {seatId}
-                                </button>
-                            );
-                        })
-                    )}
-                </div>
-                
-
-                {selectedSeats.length > 0 && (
-                    <>
-                        <h2 className={styles.sectionTitle}>Select Ticket Type for Each Seat *</h2>
-                        {selectedSeats.map(seat => (
-                            <div key={seat} className={styles.ticketRow}>
-                                <span>{seat}</span>
-                                <select className={styles.ticketDropdown}
-                                    value={ticketTypes[seat] || ''}
-                                    onChange={(e) => handleTicketTypeChange(seat, e.target.value)}
-                                >
-                                    <option value="">--Choose ticket type--</option>
-                                    <option value="child">Child ($8.00)</option>
-                                    <option value="adult">Adult ($15.00)</option>
-                                    <option value="senior">Senior ($10.00)</option>
-                                </select>
-                            </div>
-                        ))}
-                    </> 
-                )}
-
-                <button
-                    className={styles.proceedButton}
-                    onClick={handleContinueBooking}
-                >
-                    Continue Booking
-                </button>
-                {error && <p className={styles.error}>{error}</p>}
-            </div>
+      {error && (
+        <div style={{ color: 'red', marginBottom: 16 }}>
+          <strong>Error:</strong> {error}
         </div>
-    );
+      )}
+
+      <div style={{ marginTop: "30px" }}>
+        <h2 className={styles.sectionTitle}>Select Your Seats *</h2>
+        <div className={styles.screen}>Movie Screen Here</div>
+        <div className={styles.seatsGrid}>
+          {rows.map(row =>
+            Array.from({ length: seatsPerRow }, (_, i) => {
+              const seatId = `${row}${i + 1}`;
+              const isSelected = selectedSeats.includes(seatId);
+              return (
+                <button
+                  key={seatId}
+                  onClick={() => handleSeatClick(seatId)}
+                  className={`${styles.seat} ${isSelected ? styles.selected : ''}`}
+                >
+                  {seatId}
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {selectedSeats.length > 0 && (
+          <>
+            <h2 className={styles.sectionTitle}>
+              Select Ticket Type for Each Seat *
+            </h2>
+            {selectedSeats.map(seat => (
+              <div key={seat} className={styles.ticketRow}>
+                <span>{seat}</span>
+                <select
+                  className={styles.ticketDropdown}
+                  value={ticketTypes[seat] || ''}
+                  onChange={(e) =>
+                    handleTicketTypeChange(seat, e.target.value)
+                  }
+                >
+                  <option value="">--Choose ticket type--</option>
+                  <option value="child">Child ($8.00)</option>
+                  <option value="adult">Adult ($15.00)</option>
+                  <option value="senior">Senior ($10.00)</option>
+                </select>
+              </div>
+            ))}
+          </>
+        )}
+
+        <button
+          className={styles.proceedButton}
+          onClick={handleContinueBooking}
+        >
+          Continue Booking
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default BookingPage;

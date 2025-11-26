@@ -26,7 +26,7 @@ function ReviewBookingPage() {
         return <p>No booking data found. Please go back and select seats.</p>;
     }
 
-    const { movieTitle, date, time, selectedSeats, ticketTypes } = bookingData;
+    const { showtimeId, selectedSeats, ticketTypes } = bookingData;
 
     // Calculate total price
     const ticketPrices = { child: 8, adult: 15, senior: 10 };
@@ -35,26 +35,53 @@ function ReviewBookingPage() {
         0
     );
 
-    const handlePurchase = () => {
+    const handlePurchase = async () => {
         if (!cardNumber || !expiry || !cvv) {
             setError('Please fill in all payment fields.');
             return;
         }
 
-        console.log('Purchasing tickets:', { movieTitle, date, time, selectedSeats, ticketTypes, cardNumber, expiry, cvv });
+        try {
+            const token = localStorage.getItem("token");
 
-        setSuccess('Tickets purchased successfully!');
-        setError('');
-        setTimeout(() => navigate('/order-confirmation'), 500);
+            const res = await fetch("http://localhost:5001/api/bookings", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    // Support both _id and id shapes from UserContext
+                    user: (user && (user._id || user.id)) || null,
+                    showtime: showtimeId || null,
+                    seats: selectedSeats.map(seat => ({
+                        row: seat[0],
+                        number: parseInt(seat.slice(1))
+                    })),
+                    ticketCount: selectedSeats.length,
+                    ageCategories: Object.values(ticketTypes)
+                })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                setError(data.error || "Booking failed");
+                return;
+            }
+
+            setSuccess("Tickets booked successfully!");
+            setTimeout(() => navigate("/order-confirmation", { state: data }), 500);
+        } catch (err) {
+            setError("Network error");
+        }
     };
+
 
     return (
         <div className={styles.reviewContainer}>
             <div className={styles.leftColumn}>
                 <h1>Review Your Booking</h1>
-                <h3>Movie: {movieTitle}</h3>
-                <h3>Date: {date}</h3>
-                <h3>Time: {time}</h3>
 
                 <div >
                     <h2 className={styles.sectionTitle}>Payment Information</h2>
