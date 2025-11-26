@@ -37,7 +37,7 @@ function BookingPage() {
       console.log("No showtimeId provided");
       return;
     }
-    const url = `/api/showtime/${showtimeId}`;
+    const url = `/api/showtimes/by-id/${showtimeId}`;
     console.log("Fetching showtime from:", url);
     fetch(url)
       .then(async res => {
@@ -122,32 +122,44 @@ function BookingPage() {
       return;
     }
 
-    const seatsForDB = selectedSeats.map(seat => ({
+    // Pre-check seat availability before navigating to payment
+    const seatsForCheck = selectedSeats.map(seat => ({
       row: seat[0],
       number: Number(seat.slice(1))
     }));
 
-    const ageCategories = selectedSeats.map(seat => ticketTypes[seat]);
-
-    // ✅ SEND TO DATABASE
-    fetch("/api/bookings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user: user.id,
-        showtime: showtimeId,
-        seats: seatsForDB,
-        movieTitle,
-        ticketCount: seatsForDB.length,
-        ageCategories
-      })
+    fetch(`http://localhost:5001/api/showtimes/${showtimeId}/check-seats`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seats: seatsForCheck })
     })
       .then(async res => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        navigate('/order-confirmation', { state: data });
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); } catch { json = null; }
+        if (!res.ok) {
+          const msg = (json && (json.error || json.message)) || `Seat check failed (HTTP ${res.status}).`;
+          throw new Error(msg);
+        }
+        return json || { ok: false, error: 'Invalid response from server' };
       })
-      .catch(err => setError(err.message));
+      .then(result => {
+        if (!result.ok) {
+          const msg = result.conflicts && result.conflicts.length
+            ? `Seat(s) ${result.conflicts.join(', ')} are already booked for this showtime. Please select different seats.`
+            : (result.error || 'Some seats are unavailable.');
+          setError(msg);
+          return;
+        }
+        // Seats available — proceed to review page
+        navigate('/review-booking', {
+          state: { showtimeId, selectedSeats, ticketTypes }
+        });
+      })
+      .catch(err => {
+        setError(err.message || 'Failed to verify seat availability. Please try again.');
+        console.error('Seat check failed:', err);
+      });
   };
 
   return (

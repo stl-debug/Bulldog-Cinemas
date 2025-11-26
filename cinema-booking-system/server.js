@@ -204,6 +204,51 @@ app.get("/api/movies/:movieId/show-dates", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Get showtime by ID (booking page)
+app.get("/api/showtimes/by-id/:id", async (req, res) => {
+  try {
+    const showtime = await Showtime.findById(req.params.id).lean();
+    if (!showtime) {
+      return res.status(404).json({ error: "Showtime not found" });
+    }
+    res.json(showtime);
+  } catch (err) {
+    console.error("Error fetching showtime:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Check seat availability for a showtime (pre-check before payment)
+app.post("/api/showtimes/:id/check-seats", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { seats } = req.body;
+    if (!Array.isArray(seats) || seats.length === 0) {
+      return res.status(400).json({ ok: false, error: "No seats provided" });
+    }
+
+    const s = await Showtime.findById(id).lean();
+    if (!s) return res.status(404).json({ ok: false, error: "Showtime not found" });
+
+    const soldSet = new Set(
+      (s.seats || [])
+        .filter(x => x.status === "sold")
+        .map(x => `${x.row}${x.number}`)
+    );
+
+    const requested = seats.map(seat => `${seat.row}${seat.number}`);
+    const conflicts = requested.filter(code => soldSet.has(code));
+
+    if (conflicts.length > 0) {
+      return res.status(200).json({ ok: false, conflicts });
+    }
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error("Error in check-seats:", err);
+    res.status(500).json({ ok: false, error: "Server error" });
+  }
+});
+
 // Showtimes for a specific date (movie page → time buttons)
 // Get all showtimes for a movie
 app.get("/api/showtimes/:movieId", async (req, res) => {
