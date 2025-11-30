@@ -9,6 +9,8 @@ function ReviewBookingPage() {
   const location = useLocation();
   const bookingData = location.state;
 
+
+
   // Saved cards
   const [savedCards, setSavedCards] = useState([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("saved"); // "saved" or "new"
@@ -127,6 +129,12 @@ function ReviewBookingPage() {
       setPromoApplying(false);
     }
   };
+
+  const handleRemovePromo = () => {
+  setPromoInfo(null);   // stop applying the discount
+  setPromoCode('');     // clear the input box
+  setPromoError('');    // clear any promo error message
+};
 
   const handlePurchase = async () => {
     setError('');
@@ -328,14 +336,24 @@ function ReviewBookingPage() {
               </button>
             </div>
             {promoError && <p className={styles.error}>{promoError}</p>}
-            {promoInfo && (
-              <p className={styles.success}>
-                Applied {promoInfo.code}:{" "}
-                {promoInfo.discountType === "PERCENT"
-                  ? `${promoInfo.discountValue}% off`
-                  : `$${promoInfo.discountValue} off`}
-              </p>
-            )}
+{promoInfo && (
+  <div style={{ marginTop: "0.5rem" }}>
+    <p className={styles.success}>
+      Applied {promoInfo.code}:{" "}
+      {promoInfo.discountType === "PERCENT"
+        ? `${promoInfo.discountValue}% off`
+        : `$${promoInfo.discountValue} off`}
+    </p>
+    <button
+      type="button"
+      onClick={handleRemovePromo}
+      className={styles.button}
+      style={{ marginTop: "0.25rem", backgroundColor: "#555" }}
+    >
+      Remove Promo
+    </button>
+  </div>
+)}
           </div>
 
           {/* Confirm order button */}
