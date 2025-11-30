@@ -15,6 +15,7 @@ const Promotion = require("./src/models/Promotion");
 const { encryptText } = require("./src/utils/crypto"); 
 
 const app = express();
+//
 
 // Middleware
 app.use(
@@ -832,10 +833,9 @@ app.delete("/api/addresses/:id", auth, async (req, res) => {
   res.json({ message: "Address removed" });
 });
 
-// ADMIN: create a showtime by snapshotting seats from theatre/auditorium
+
 app.post("/api/showtimes", async (req, res) => {
   try {
-    // Support both old and new parameter names for backward compatibility
     const movieId = req.body.movieId || req.body.movieID;
     const theatreId = req.body.theatreId || req.body.theatre;
     const auditoriumID = req.body.auditoriumID;
@@ -947,6 +947,117 @@ app.post("/api/showtimes", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Bulk add showtimes over a date range
+app.post("/api/showtimes/bulk", async (req, res) => {
+  try {
+    const { movieId, theatreId, auditoriumID, showroom, startDate, endDate, times } = req.body || {};
+
+    if (!movieId) return res.status(400).json({ error: "movieId is required" });
+    if (!startDate || !endDate) return res.status(400).json({ error: "startDate and endDate are required (YYYY-MM-DD)" });
+    if (!Array.isArray(times) || times.length === 0) {
+      return res.status(400).json({ error: "times array (e.g., [\"14:00\",\"17:00\"]) is required" });
+    }
+
+    const movie = await Movie.findById(movieId);
+    if (!movie) return res.status(404).json({ error: "Movie not found" });
+
+    // Parse dates as UTC days
+    const start = new Date(`${startDate}T00:00:00.000Z`);
+    const end = new Date(`${endDate}T00:00:00.000Z`);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({ error: "Invalid startDate or endDate" });
+    }
+    if (end < start) return res.status(400).json({ error: "endDate must be on or after startDate" });
+
+    // Build seats depending on format
+    let seatTemplate = [];
+    if (theatreId && auditoriumID) {
+      const Theatre = require("./src/models/Theatre");
+      const theatre = await Theatre.findById(theatreId).lean();
+      if (!theatre) return res.status(404).json({ error: "Theatre not found" });
+      const aud = (theatre.auditoriums || []).find(a => a.auditoriumID === auditoriumID);
+      if (!aud) return res.status(404).json({ error: "Auditorium not found in theatre" });
+      seatTemplate = (aud.seats || []).map(s => ({ row: s.rowLabel, number: s.seatNumber, status: "available" }));
+      if (seatTemplate.length === 0) return res.status(400).json({ error: "No seats defined for this auditorium" });
+    } else {
+      if (!showroom) return res.status(400).json({ error: "showroom is required when theatreId/auditoriumID not provided" });
+      const rows = "ABCDEFGHIJ";
+      for (let r = 0; r < rows.length; r++) {
+        for (let n = 1; n <= 10; n++) {
+          seatTemplate.push({ row: rows[r], number: n, status: "available" });
+        }
+      }
+    }
+
+    let created = 0;
+    const createdIds = [];
+    const createdTimes = [];
+
+    // Iterate dates inclusive
+    const day = new Date(start);
+    while (day <= end) {
+      for (const t of times) {
+        const [hh, mm] = String(t).split(":");
+        const y = day.getUTCFullYear();
+        const m = String(day.getUTCMonth() + 1).padStart(2, "0");
+        const d = String(day.getUTCDate()).padStart(2, "0");
+  // Build ISO with fixed -05:00 offset to keep times as intended locally
+  const isoWithOffset = `${y}-${m}-${d}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00-05:00`;
+  const startTime = new Date(isoWithOffset);
+
+        // Check duplicates
+        const dupQuery = {
+          movie: movie._id,
+          startTime,
+        };
+        if (theatreId && auditoriumID) {
+          dupQuery.theatre = undefined; // theatre-based showtimes have theatre set; legacy uses null
+          dupQuery.auditoriumID = auditoriumID;
+        } else {
+          dupQuery.theatre = null;
+          dupQuery.showroom = showroom;
+        }
+
+        const exists = await Showtime.findOne(dupQuery).lean();
+        if (exists) {
+          continue;
+        }
+
+        const showtimeDoc = {
+          movie: movie._id,
+          movieTitle: movie.title,
+          startTime,
+          seats: seatTemplate.map(s => ({ ...s })),
+          layoutVersion: 1,
+          layoutChecksum: "",
+        };
+        if (theatreId && auditoriumID) {
+          showtimeDoc.theatre = theatreId;
+          showtimeDoc.auditoriumID = auditoriumID;
+          showtimeDoc.showroom = showroom || auditoriumID;
+        } else {
+          showtimeDoc.theatre = null;
+          showtimeDoc.auditoriumID = showroom;
+          showtimeDoc.showroom = showroom;
+        }
+
+        const st = new Showtime(showtimeDoc);
+        await st.save();
+        created++;
+        createdIds.push(st._id);
+        createdTimes.push(startTime.toISOString());
+      }
+      day.setUTCDate(day.getUTCDate() + 1);
+    }
+
+    res.json({ message: "Bulk showtimes created", created, ids: createdIds, times: createdTimes });
+  } catch (err) {
+    console.error("Error in /api/showtimes/bulk:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // Delete showtime (must come before GET to avoid route conflicts)
 app.delete("/api/showtimes/:id", async (req, res) => {

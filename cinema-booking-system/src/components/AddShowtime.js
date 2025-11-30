@@ -1,234 +1,134 @@
-import React, { useState, useEffect } from 'react';
-import styles from '../styles/AdminHome.module.css';
+import React, { useEffect, useState } from "react";
+import styles from "../styles/AdminHome.module.css";
+import axios from "axios";
 
-const API_BASE = process.env.REACT_APP_API_URL || '';
-
-function AddShowtime() {
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
+export default function AddShowtime() {
   const [movies, setMovies] = useState([]);
-  const [existingShowtimes, setExistingShowtimes] = useState([]);
-  const [loadingShowtimes, setLoadingShowtimes] = useState(false);
-
-  const [showtimeForm, setShowtimeForm] = useState({
-    movie: '',
-    showroom: '',
-    startTime: ''
-  });
+  const [selectedMovie, setSelectedMovie] = useState("");
+  const [showrooms] = useState(["Auditorium 1", "Auditorium 2", "Auditorium 3"]);
+  const [selectedShowroom, setSelectedShowroom] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [time, setTime] = useState("");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
+    async function loadMovies() {
+      try {
+        const res = await axios.get(`/api/movies`);
+        setMovies(res.data || []);
+      } catch (err) {
+        console.error("Failed to load movies", err);
+      }
+    }
     loadMovies();
   }, []);
 
-  useEffect(() => {
-    if (showtimeForm.movie) {
-      loadShowtimes(showtimeForm.movie);
-    } else {
-      setExistingShowtimes([]);
-    }
-  }, [showtimeForm.movie]);
-
-  const loadMovies = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/movies`);
-      if (res.ok) {
-        const data = await res.json();
-        setMovies(data);
-      }
-    } catch (err) {
-      console.error('Failed to load movies:', err);
-    }
-  };
-
-  const loadShowtimes = async (movieId) => {
-    try {
-      setLoadingShowtimes(true);
-      const res = await fetch(`${API_BASE}/api/showtimes/${movieId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setExistingShowtimes(data);
-      } else {
-        setExistingShowtimes([]);
-      }
-    } catch (err) {
-      console.error('Failed to load showtimes:', err);
-      setExistingShowtimes([]);
-    } finally {
-      setLoadingShowtimes(false);
-    }
-  };
-
-  const formatShowtime = (showtime) => {
-    const date = new Date(showtime.startTime || showtime.date);
-    return date.toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setShowtimeForm(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleSubmit = async (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
-    setSaving(true);
-    setMessage({ type: '', text: '' });
+    setMessage("");
+
+    if (!selectedMovie || !selectedShowroom) {
+      setMessage("Please select a movie and showroom.");
+      return;
+    }
+    if (!startDate || !endDate || !time) {
+      setMessage("Please provide a from date, to date, and a time.");
+      return;
+    }
 
     try {
-      if (!showtimeForm.movie) {
-        throw new Error('Please select a movie');
-      }
-      if (!showtimeForm.showroom) {
-        throw new Error('Please enter a showroom');
-      }
-      if (!showtimeForm.startTime) {
-        throw new Error('Please enter a start time');
-      }
-
-      const showtimeData = {
-        movieID: showtimeForm.movie,
-        showroom: showtimeForm.showroom,
-        startTime: new Date(showtimeForm.startTime).toISOString(),
-        date: new Date(showtimeForm.startTime).toISOString(),
-        capacity: 100,
-        layoutVersion: 1
+      // Normalize date inputs to YYYY-MM-DD
+      const normalizeDate = (d) => {
+        // If already in YYYY-MM-DD, return as-is
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+        const dt = new Date(d);
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, "0");
+        const day = String(dt.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
       };
 
-      const res = await fetch(`${API_BASE}/api/showtimes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(showtimeData)
-      });
+      const normalizedStart = normalizeDate(startDate);
+      const normalizedEnd = normalizeDate(endDate);
 
-      const data = await res.json();
+      // Normalize time to 24h HH:mm for backend, accepting "1:30 PM" or "13:30"
+      const normalizeTime = (t) => {
+        const ampmMatch = t.match(/^\s*(\d{1,2}):(\d{2})\s*(AM|PM)\s*$/i);
+        if (ampmMatch) {
+          let hh = parseInt(ampmMatch[1], 10);
+          const mm = ampmMatch[2];
+          const ampm = ampmMatch[3].toUpperCase();
+          if (ampm === "PM" && hh !== 12) hh += 12;
+          if (ampm === "AM" && hh === 12) hh = 0;
+          return `${String(hh).padStart(2, "0")}:${mm}`;
+        }
+        // Fallback: try Date parsing
+        const dateObj = new Date(`1970-01-01T${t}`);
+        const hh = String(dateObj.getHours()).padStart(2, "0");
+        const mm = String(dateObj.getMinutes()).padStart(2, "0");
+        return `${hh}:${mm}`;
+      };
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to create showtime');
-      }
+      const normalizedTime = normalizeTime(time);
 
-      setMessage({ type: 'success', text: 'Showtime created successfully!' });
-      // Reload showtimes after successful creation
-      if (showtimeForm.movie) {
-        loadShowtimes(showtimeForm.movie);
-      }
-      setShowtimeForm({
-        movie: showtimeForm.movie, // Keep the movie selected
-        showroom: '',
-        startTime: ''
-      });
+      const payload = {
+        movieId: selectedMovie,
+        showroom: selectedShowroom,
+        startDate: normalizedStart,
+        endDate: normalizedEnd,
+        times: [normalizedTime],
+      };
+      const res = await axios.post(`/api/showtimes/bulk`, payload);
+      setMessage(`Created ${res.data.created} showtimes.`);
     } catch (err) {
-      setMessage({ type: 'error', text: err.message });
-    } finally {
-      setSaving(false);
+      console.error("Error creating showtime:", err);
+      const apiError = err.response?.data?.error;
+      setMessage(apiError ? `Error: ${apiError}` : "Failed to create showtimes.");
     }
-  };
+  }
 
   return (
-    <div className={styles.formContainer}>
-      <h2>Add New Showtime</h2>
+    <div className={styles.card}>
+      <h2>Add Showtime</h2>
       <form onSubmit={handleSubmit} className={styles.form}>
-        <label className={styles.label}>
+        <label>
           Movie *
-          <select
-            name="movie"
-            value={showtimeForm.movie}
-            onChange={handleInputChange}
-            className={styles.input}
-            required
-          >
+          <select value={selectedMovie} onChange={(e) => setSelectedMovie(e.target.value)}>
             <option value="">Select a movie</option>
-            {movies.map((movie) => (
-              <option key={movie._id} value={movie._id}>
-                {movie.title}
-              </option>
+            {movies.map((m) => (
+              <option key={m._id} value={m._id}>{m.title}</option>
             ))}
           </select>
         </label>
 
-        <label className={styles.label}>
+        <label>
           Showroom *
-          <input
-            type="text"
-            name="showroom"
-            value={showtimeForm.showroom}
-            onChange={handleInputChange}
-            className={styles.input}
-            placeholder="Auditorium 1"
-            required
-          />
+          <select value={selectedShowroom} onChange={(e) => setSelectedShowroom(e.target.value)}>
+            <option value="">Select a showroom</option>
+            {showrooms.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
         </label>
 
-        <label className={styles.label}>
-          Start Time *
-          <input
-            type="datetime-local"
-            name="startTime"
-            value={showtimeForm.startTime}
-            onChange={handleInputChange}
-            className={styles.input}
-            required
-          />
+        <label>
+          From Date *
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </label>
+        <label>
+          To Date *
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </label>
+        <label>
+          Time (24h) *
+          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
         </label>
 
-        {showtimeForm.movie && (
-          <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-            <h3 style={{ marginBottom: '0.5rem', fontSize: '16px', fontWeight: 'bold' }}>
-              Existing Showtimes for this Movie:
-            </h3>
-            {loadingShowtimes ? (
-              <p>Loading showtimes...</p>
-            ) : existingShowtimes.length === 0 ? (
-              <p style={{ color: '#666', fontStyle: 'italic' }}>No showtimes scheduled yet.</p>
-            ) : (
-              <div style={{
-                backgroundColor: '#f5f5f5',
-                padding: '1rem',
-                borderRadius: '5px',
-                maxHeight: '200px',
-                overflowY: 'auto'
-              }}>
-                {existingShowtimes.map((showtime, index) => (
-                  <div key={showtime._id || index} style={{
-                    padding: '0.5rem',
-                    borderBottom: index < existingShowtimes.length - 1 ? '1px solid #ddd' : 'none',
-                    fontSize: '14px',
-                    color: '#333'
-                  }}>
-                    <strong style={{ color: '#333' }}>{formatShowtime(showtime)}</strong> - <span style={{ color: '#333' }}>{showtime.showroom || 'N/A'}</span>
-                    {showtime.capacity && (
-                      <span style={{ color: '#666', marginLeft: '0.5rem' }}>
-                        ({showtime.bookedSeats || 0}/{showtime.capacity} seats)
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        <button type="submit" disabled={saving} className={styles.submitBtn}>
-          {saving ? 'Saving...' : 'Create Showtime'}
-        </button>
-
-        {message.text && (
-          <div className={message.type === 'error' ? styles.errorMsg : styles.successMsg}>
-            {message.text}
-          </div>
-        )}
+        <button type="submit">Create</button>
       </form>
+      {message && <p className={styles.message}>{message}</p>}
     </div>
   );
 }
-
-export default AddShowtime;
 
