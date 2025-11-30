@@ -88,6 +88,68 @@ async function sendProfileUpdateEmail(userEmail, changes) {
   }
 }
 
+async function sendBookingConfirmationEmail(user, booking) {
+  try {
+    const transporter = makeTransport();
+
+    const showTime = booking.startTime
+      ? new Date(booking.startTime).toLocaleString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })
+      : "Unknown";
+
+    const seatList =
+      (booking.seats || [])
+        .map(s => `${s.row}${s.number}`)
+        .join(", ") || "N/A";
+
+    const totalText =
+      typeof booking.total === "number"
+        ? `$${booking.total.toFixed(2)}`
+        : "N/A";
+
+    const last4 = booking.paymentLast4
+      ? `**** **** **** ${booking.paymentLast4}`
+      : "N/A";
+
+    const ticketCount =
+      booking.ticketCount || (booking.seats || []).length || 0;
+
+    const html = `
+      <h2>Your Bulldog Cinemas order is confirmed 🎟️</h2>
+      <p>Hi ${user.firstName || ""},</p>
+      <p>Thank you for your purchase! Here are your order details:</p>
+      <ul>
+        <li><strong>Movie:</strong> ${booking.movieTitle || "N/A"}</li>
+        <li><strong>Theatre:</strong> ${booking.theatreName || "Bulldog Cinemas"}</li>
+        <li><strong>Showroom:</strong> ${booking.showroom || "N/A"}</li>
+        <li><strong>Showtime:</strong> ${showTime}</li>
+        <li><strong>Seats:</strong> ${seatList}</li>
+        <li><strong>Tickets:</strong> ${ticketCount}</li>
+        <li><strong>Total Charged:</strong> ${totalText}</li>
+        <li><strong>Card:</strong> ${last4}</li>
+      </ul>
+      <p>Enjoy the show! 🍿</p>
+    `;
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: user.email,
+      subject: "Your Bulldog Cinemas Order Confirmation",
+      html,
+    });
+
+    console.log(`Booking confirmation email sent to ${user.email}`);
+  } catch (err) {
+    console.error("Error sending booking confirmation email:", err);
+  }
+}
+
 
 // DB 
 mongoose
@@ -417,6 +479,19 @@ app.post("/api/bookings", async (req, res) => {
     );
 
     console.log("AFTER UPDATE - Seat statuses:", updatedShowtime.seats.map(s => `${s.row}${s.number}:${s.status}`));
+
+        // Send booking confirmation email (non-fatal if it fails)
+    try {
+      const userDoc = await User.findById(user);
+      if (userDoc) {
+        await sendBookingConfirmationEmail(userDoc, booking);
+      } else {
+        console.warn("Could not find user doc for booking email:", user);
+      }
+    } catch (err) {
+      console.error("Error while sending booking confirmation email:", err);
+      // don't fail the booking just because email failed
+    }
 
     res.status(201).json({
       success: true,
