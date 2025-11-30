@@ -333,8 +333,8 @@ app.get("/api/showtime/:showtimeId", async (req, res) => {
 // POST /api/bookings - Create a new booking
 app.post("/api/bookings", async (req, res) => {
   try {
-    const { user, showtime, seats, movieTitle, ticketCount, ageCategories } = req.body;
-    console.log("POST /api/bookings - Creating booking with:", { user, showtime, seats, movieTitle, ticketCount, ageCategories });
+    const { user, showtime, seats, movieTitle, ticketCount, ageCategories, total, paymentLast4 } = req.body;
+    console.log("POST /api/bookings - Creating booking with:", { user, showtime, seats, movieTitle, ticketCount, ageCategories, total, paymentLast4 });
 
     // Validate required fields
     if (!user || !showtime || !seats || !Array.isArray(seats) || seats.length === 0) {
@@ -376,7 +376,9 @@ app.post("/api/bookings", async (req, res) => {
       startTime: showtimeData.startTime || showtimeData.date,
       seats,
       ticketCount,
-      ageCategories
+      ageCategories,
+      total: typeof total === "number" ? total : undefined,
+      paymentLast4: paymentLast4 || undefined  
     });
 
     await booking.save();
@@ -1151,6 +1153,41 @@ app.post("/api/promotions/send", async (req, res) => {
     res.json({ message: "Promotions sent successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Validate a promo code and return discount info
+app.post("/api/promotions/validate", async (req, res) => {
+  try {
+    const { code } = req.body || {};
+    if (!code) {
+      return res.status(400).json({ error: "Promotion code is required." });
+    }
+
+    // Codes are stored as _id in Promotion, usually uppercase
+    const promo = await Promotion.findById(String(code).toUpperCase());
+    if (!promo) {
+      return res.status(404).json({ error: "Invalid promotion code." });
+    }
+
+    const now = new Date();
+    if (promo.validFrom && promo.validFrom > now) {
+      return res.status(400).json({ error: "This promotion is not yet valid." });
+    }
+    if (promo.validTo && promo.validTo < now) {
+      return res.status(400).json({ error: "This promotion has expired." });
+    }
+
+    return res.json({
+      ok: true,
+      code: promo._id,
+      discountType: promo.discountType,  // "PERCENT" or "FIXED"
+      discountValue: promo.discountValue,
+      description: promo.description,
+    });
+  } catch (err) {
+    console.error("Error validating promotion:", err);
+    res.status(500).json({ error: "Failed to validate promotion code." });
   }
 });
 
