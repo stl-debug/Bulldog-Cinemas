@@ -15,6 +15,8 @@ import AdminHome from './pages/AdminHome';
 import OrderConfirmationPage from './pages/OrderConfirmationPage';
 import RegistrationPage from './pages/RegistrationPage';
 import ProfilePage from './pages/ProfilePage';
+import OrderHistoryPage from "./pages/OrderHistoryPage";
+
 
 
 
@@ -37,6 +39,7 @@ function App() {
             <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
             <Route path="/signup" element={<RegistrationPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/order-history" element={<OrderHistoryPage />} />
 
 
             

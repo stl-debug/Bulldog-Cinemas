@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import styles from "../styles/ProfilePage.module.css";
 
 const API_BASE =
@@ -534,6 +535,25 @@ export default function ProfilePage() {
               </form>
             )}
           </section>
+
+          {/* Orders */}
+<section className={styles.section}>
+  <h3 className={styles.sectionTitle}>Orders</h3>
+  <p className={styles.subtle}>View your past ticket bookings.</p>
+
+  <Link
+    to="/order-history"
+    className={styles.button}
+    style={{ 
+      display: "inline-block",
+      textDecoration: "none",
+      marginTop: "8px"
+    }}
+  >
+    View Order History
+  </Link>
+</section>
+
 
           {/* Password Change */}
           <section className={styles.section}>
