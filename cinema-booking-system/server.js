@@ -427,6 +427,36 @@ app.post("/api/bookings", async (req, res) => {
   }
 });
 
+// GET /api/auth/orders - get bookings for the logged-in user
+app.get("/api/auth/orders", auth, async (req, res) => {
+  try {
+    const bookings = await Booking.find({ user: req.user.id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const orders = bookings.map((b) => ({
+      id: b._id,
+      movieTitle: b.movieTitle,
+      theatreName: b.theatreName,
+      showroom: b.showroom,
+      startTime: b.startTime,
+      seats: (b.seats || []).map((s) => `${s.row}${s.number}`),
+      total: b.total,                 // may be undefined for older bookings, that's fine
+      paymentLast4: b.paymentLast4,   // may be undefined
+      ticketCount: b.ticketCount,
+      ageCategories: b.ageCategories,
+      createdAt: b.createdAt,
+    }));
+
+    res.json({ orders });
+  } catch (err) {
+    console.error("Error loading order history:", err);
+    res.status(500).json({ error: "Failed to load order history" });
+  }
+});
+
+
+
 // DEBUG: Log all incoming requests
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
