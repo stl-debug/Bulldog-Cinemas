@@ -391,8 +391,8 @@ app.get("/api/showtime/:showtimeId", async (req, res) => {
 // POST /api/bookings - Create a new booking
 app.post("/api/bookings", async (req, res) => {
   try {
-    const { user, showtime, seats, movieTitle, ticketCount, ageCategories, total, paymentLast4 } = req.body;
-    console.log("POST /api/bookings - Creating booking with:", { user, showtime, seats, movieTitle, ticketCount, ageCategories, total, paymentLast4 });
+    const { user, showtime, seats, movieTitle, ticketCount, ageCategories, total, paymentLast4, promoCode } = req.body;
+    console.log("POST /api/bookings - Creating booking with:", { user, showtime, seats, movieTitle, ticketCount, ageCategories, total, paymentLast4, promoCode });
 
     // Validate required fields
     if (!user || !showtime || !seats || !Array.isArray(seats) || seats.length === 0) {
@@ -424,6 +424,19 @@ app.post("/api/bookings", async (req, res) => {
       return res.status(409).json({ error: `Seat(s) ${bookedSeats.join(", ")} are already booked for this showtime. Please select different seats.` });
     }
 
+    if (promoCode) {
+  const alreadyUsed = await Booking.findOne({
+    user,
+    appliedPromoCode: promoCode
+  });
+
+  if (alreadyUsed) {
+    return res
+      .status(400)
+      .json({ error: "You have already used this promo code." });
+  }
+}
+
     // Create the booking
     const booking = new Booking({
       user,
@@ -436,7 +449,8 @@ app.post("/api/bookings", async (req, res) => {
       ticketCount,
       ageCategories,
       total: typeof total === "number" ? total : undefined,
-      paymentLast4: paymentLast4 || undefined  
+      paymentLast4: paymentLast4 || undefined,
+      appliedPromoCode: promoCode || undefined
     });
 
     await booking.save();

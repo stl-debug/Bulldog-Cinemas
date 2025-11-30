@@ -14,11 +14,14 @@ const BookingSchema = new mongoose.Schema(
 
     seats: [{ row: String, number: Number }],
     total: Number,
-    paymentLast4: String, // safe metadata only
+    paymentLast4: String, 
 
     // NEW FIELDS
-    ticketCount: { type: Number },               // how many tickets this booking is for
-    ageCategories: [{ type: String }]            // e.g. ["Adult", "Adult", "Child"]
+    ticketCount: { type: Number },              
+    ageCategories: [{ type: String }],          
+
+    // store which promo was used
+    appliedPromoCode: { type: String }
   },
   {
     collection: "bookings",
@@ -29,5 +32,8 @@ const BookingSchema = new mongoose.Schema(
 // Index for finding bookings by user and showtime
 BookingSchema.index({ user: 1, showtime: 1 });
 
+// ensures a user can only use a promo once
+BookingSchema.index({ user: 1, appliedPromoCode: 1 });
 
 module.exports = mongoose.model("Booking", BookingSchema);
+

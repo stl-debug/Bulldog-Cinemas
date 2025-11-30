@@ -189,7 +189,8 @@ function ReviewBookingPage() {
           ticketCount: selectedSeats.length,
           ageCategories: Object.values(ticketTypes),
           total: totalToCharge,
-          paymentLast4
+          paymentLast4,
+          promoCode: promoInfo?.code || null 
         })
       });
 
