@@ -57,12 +57,36 @@ function LoginPage() {
     }
   };
 
+  const handleResend = async () => {
+    if (!email) {
+      setError('Enter your email above first.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/auth/resend-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setError(`A new confirmation email has been sent to ${email}.`);
+      } else {
+        setError(data.error || 'Unable to resend confirmation email.');
+      }
+    } catch (e) {
+      setError('Network error sending confirmation email.');
+    }
+  };
+
+  const isVerificationError = error && /account not verified|verify|confirmation/.test(error.toLowerCase());
+
   return (
     <div className={styles.loginContainer}>
       <div className={styles.loginCard}>
         <h2 className={styles.title}>Login to Bulldog Cinemas</h2>
         <form onSubmit={handleSubmit} className={styles.form}>
-        {error && <p className={styles.error}>{error}</p>}
+  {error && <p className={styles.error}>{error}</p>}
 
           <label className={styles.label}>Email *</label>
           <input
@@ -97,6 +121,15 @@ function LoginPage() {
             >
               Create an Account
             </button>
+            {isVerificationError && (
+              <button
+                type="button"
+                className={styles.link}
+                onClick={handleResend}
+              >
+                Resend Confirmation Email
+              </button>
+            )}
           </div>
         </form>
       </div>

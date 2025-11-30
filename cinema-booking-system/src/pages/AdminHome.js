@@ -57,7 +57,6 @@ function AdminHome() {
           >
             Manage Showtimes
           </button>
-          <button className={styles.actionBtn}>Manage Members</button>
           <button 
             className={styles.actionBtn}
             onClick={() => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import styles from "../styles/ProfilePage.module.css";
 
@@ -74,7 +74,7 @@ export default function ProfilePage() {
   }, []);
 
    // data loaders
-   async function loadMe() {
+   const loadMe = useCallback(async () => {
      setLoadingMe(true);
      setErr(null);
      try {
@@ -103,9 +103,9 @@ export default function ProfilePage() {
      } finally {
        setLoadingMe(false);
      }
-   }
+   }, [token]);
 
-   async function loadCards() {
+   const loadCards = useCallback(async () => {
      if (!token) {
        setCards([]);
        return;
@@ -119,14 +119,14 @@ export default function ProfilePage() {
      } catch {
        setCards([]);
      }
-   }
+   }, [token]);
 
   useEffect(() => {
     if (token) {
       loadMe();
       loadCards();
     }
-  }, [token]);
+  }, [token, loadMe, loadCards]);
 
   // validators & handlers
   function validateCardInput() {

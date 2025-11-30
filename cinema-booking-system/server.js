@@ -627,6 +627,13 @@ app.post("/api/auth/login", async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ error: "User not found" });
 
+    // Block login for users who have not confirmed their email yet
+    if (user.status !== "Active") {
+      return res.status(403).json({
+        error: "Account not verified. Please check your email for the confirmation link before logging in."
+      });
+    }
+
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: "Incorrect password" });
@@ -634,6 +641,25 @@ app.post("/api/auth/login", async (req, res) => {
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1d" });
     res.json({ token, user: { id: user._id, email: user.email, role: user.role, status: user.status } });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Resend confirmation email
+app.post("/api/auth/resend-confirmation", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email is required" });
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if (user.status === "Active") {
+      return res.status(400).json({ error: "Account already verified" });
+    }
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1d" });
+    await sendConfirmationEmail(email, token);
+    res.json({ message: "Confirmation email resent" });
+  } catch (err) {
+    console.error("Error resending confirmation email:", err);
     res.status(500).json({ error: err.message });
   }
 });
