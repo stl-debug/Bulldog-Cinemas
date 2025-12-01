@@ -19,11 +19,9 @@ function Header() {
         <div className={styles.logo}>BULLDOG CINEMAS</div>
         <nav className={styles.navbar}>
           <div className={styles.menuLeft}>
+            <Link to="/" className={styles.navLink}>Home</Link>
             {user?.role !== 'admin' && (
-              <>
-                <Link to="/" className={styles.navLink}>Home</Link>
-                <Link to="/search" className={styles.navLink}>Search Movies</Link>
-              </>
+              <Link to="/search" className={styles.navLink}>Search Movies</Link>
             )}
             {user && (
               <Link to="/profile" className={styles.navLink}>Profile</Link>

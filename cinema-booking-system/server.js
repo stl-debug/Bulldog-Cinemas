@@ -13,6 +13,7 @@ const Showtime = require("./src/models/Showtime");
 const Booking = require("./src/models/Booking");
 const Promotion = require("./src/models/Promotion");
 const { encryptText } = require("./src/utils/crypto"); 
+const { EmailFactory, EMAIL_TYPES } = require("./src/utils/EmailFactory");
 
 const app = express();
 //
@@ -39,48 +40,30 @@ function makeTransport() {
 
 async function sendConfirmationEmail(userEmail, token) {
   const transporter = makeTransport();
-  const url = `${process.env.BACKEND_URL}/api/auth/confirm/${token}`;
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
-    to: userEmail,
-    subject: "Confirm your account",
-    html: `Click <a href="${url}">here</a> to confirm your account.`,
+  const payload = EmailFactory.create(EMAIL_TYPES.ACCOUNT_CONFIRM, {
+    email: userEmail,
+    token,
   });
+  await transporter.sendMail({ from: process.env.EMAIL_FROM, ...payload });
 }
 
 async function sendPasswordResetEmail(userEmail, token) {
   const transporter = makeTransport();
-  const url = `${process.env.FRONTEND_URL}/reset-password/${token}`;
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
-    to: userEmail,
-    subject: "Reset your password",
-    html: `
-      <h2>Password Reset Request</h2>
-      <p>Click the link below to reset your password (expires in 1 hour):</p>
-      <p><a href="${url}">Reset Password</a></p>
-    `,
+  const payload = EmailFactory.create(EMAIL_TYPES.PASSWORD_RESET, {
+    email: userEmail,
+    token,
   });
+  await transporter.sendMail({ from: process.env.EMAIL_FROM, ...payload });
 }
 
 async function sendProfileUpdateEmail(userEmail, changes) {
   try {
     const transporter = makeTransport();
-    const html = `
-      <h2>Your profile has been updated</h2>
-      <p>The following fields were changed:</p>
-      <ul>
-        ${changes.map(change => `<li>${change}</li>`).join('')}
-      </ul>
-      <p>If you did not make these changes, please contact support immediately.</p>
-    `;
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
-      to: userEmail,
-      subject: 'Profile Update Notification',
-      html,
+    const payload = EmailFactory.create(EMAIL_TYPES.PROFILE_UPDATE, {
+      email: userEmail,
+      changes,
     });
+    await transporter.sendMail({ from: process.env.EMAIL_FROM, ...payload });
 
     console.log(`Profile update email sent to ${userEmail}`);
   } catch (err) {
@@ -97,48 +80,14 @@ async function sendBookingConfirmationEmail(userId, booking) {
     }
 
     const transporter = makeTransport();
-
-    const dt = booking.startTime ? new Date(booking.startTime) : null;
-    const showtimeStr = dt
-      ? dt.toLocaleString("en-US", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
-        })
-      : "Unknown showtime";
-
-    const seatList = (booking.seats || [])
-      .map((s) => `${s.row}${s.number}`)
-      .join(", ");
-
-    const ticketCount =
-      booking.ticketCount || (booking.seats ? booking.seats.length : 0);
-
-    const html = `
-      <h2>Your Bulldog Cinemas Booking is Confirmed</h2>
-      <p>Hi ${user.firstName || ""},</p>
-      <p>Thank you for your purchase. Here are your booking details:</p>
-      <ul>
-        <li><strong>Movie:</strong> ${booking.movieTitle || "Movie"}</li>
-        <li><strong>Theatre:</strong> ${booking.theatreName || "Bulldog Cinemas"} ${
-          booking.showroom ? `– Showroom ${booking.showroom}` : ""
-        }</li>
-        <li><strong>Showtime:</strong> ${showtimeStr}</li>
-        <li><strong>Seats:</strong> ${seatList || "N/A"}</li>
-        <li><strong>Tickets:</strong> ${ticketCount}</li>
-      </ul>
-      <p>Enjoy your movie!</p>
-    `;
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
-      to: user.email,
-      subject: "Your Bulldog Cinemas Booking Confirmation",
-      html,
+    const bookingData =
+      typeof booking?.toObject === "function" ? booking.toObject() : { ...booking };
+    bookingData.firstName = user.firstName || "";
+    const payload = EmailFactory.create(EMAIL_TYPES.BOOKING_CONFIRMATION, {
+      email: user.email,
+      booking: bookingData,
     });
+    await transporter.sendMail({ from: process.env.EMAIL_FROM, ...payload });
 
     console.log("✅ Booking confirmation email sent to", user.email);
   } catch (err) {
@@ -1342,32 +1291,16 @@ app.post("/api/promotions/send", async (req, res) => {
     if (!promo) return res.status(404).json({ error: "Promotion not found" });
 
     const users = await User.find({ promotions: true });
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
-    });
-
-    const discountText = promo.discountType === "PERCENT" 
-      ? `${promo.discountValue}% OFF` 
-      : `$${promo.discountValue} OFF`;
+    const transporter = makeTransport();
+    const promoData =
+      typeof promo.toObject === "function" ? promo.toObject() : { ...promo };
 
     for (const u of users) {
-      await transporter.sendMail({
-        from: process.env.EMAIL_FROM,
-        to: u.email,
-        subject: "New Promotion from Bulldog Cinemas!",
-        html: `
-          <h2>🎉 ${promo._id} - ${discountText}</h2>
-          <div style="background-color: #333; color: #fff; padding: 15px; border-radius: 5px;">
-            <p style="color: #fff; margin: 0;">${promo.description}</p>
-          </div>
-          <p>Valid from ${new Date(promo.validFrom).toDateString()} to ${new Date(promo.validTo).toDateString()}</p>
-        `
+      const payload = EmailFactory.create(EMAIL_TYPES.PROMOTION_BLAST, {
+        email: u.email,
+        promo: promoData,
       });
+      await transporter.sendMail({ from: process.env.EMAIL_FROM, ...payload });
     }
 
     res.json({ message: "Promotions sent successfully" });
