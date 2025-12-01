@@ -80,7 +80,12 @@ export default function AddShowtime() {
         times: [normalizedTime],
       };
       const res = await axios.post(`/api/showtimes/bulk`, payload);
-      setMessage(`Created ${res.data.created} showtimes.`);
+      const created = res?.data?.created ?? 0;
+      if (created === 0) {
+        setMessage("You can't add a showtime at the same time as another showtime.");
+      } else {
+        setMessage(`Created ${created} showtime${created === 1 ? "" : "s"}.`);
+      }
     } catch (err) {
       console.error("Error creating showtime:", err);
       const apiError = err.response?.data?.error;

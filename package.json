@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "start": "cd cinema-booking-system && npm start"
+  },
   "dependencies": {
     "cors": "^2.8.5"
   },
